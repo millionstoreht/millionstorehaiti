@@ -1061,10 +1061,13 @@ export default function Home() {
             <p style={{ color: "#666", fontSize: "16px" }}>Pa gen pwodwi disponib kounye a.</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "20px", alignItems: "start" }}>
+          <div
+            className="catalog-layout"
+            style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "20px", alignItems: "start" }}
+          >
 
             {/* Sidebar filtè */}
-            <aside style={{
+            <aside className="filters-panel" style={{
               background: "#fff", border: "1px solid #e5e5e5",
               borderRadius: "12px", padding: "16px",
               position: "sticky", top: "92px",
@@ -1084,6 +1087,7 @@ export default function Home() {
                 const color = getCatColor(cat);
                 return (
                   <button
+                    className="filter-option"
                     key={cat}
                     onClick={() => { setSelectedCategory(cat); setSelectedBrand("Tout"); }}
                     style={{
@@ -1114,6 +1118,7 @@ export default function Home() {
                 const active = selectedBrand === brand;
                 return (
                   <button
+                    className="filter-option"
                     key={brand}
                     onClick={() => setSelectedBrand(brand)}
                     style={{
@@ -1136,8 +1141,8 @@ export default function Home() {
             </aside>
 
             {/* Lis pwodwi */}
-            <div>
-              <div style={{
+            <div className="products-panel">
+              <div className="products-toolbar" style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 marginBottom: "16px", background: "#fff", border: "1px solid #e5e5e5",
                 borderRadius: "12px", padding: "12px 16px",
@@ -1158,6 +1163,7 @@ export default function Home() {
                 </select>
               </div>
 
+              <div className="products-list-wrap">
               {filtered.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px", background: "#fff",
                   borderRadius: "14px", border: "1px solid #eee" }}>
@@ -1165,7 +1171,7 @@ export default function Home() {
                   <p style={{ color: "#666" }}>Pa gen pwodwi ki koresponn.</p>
                 </div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px" }}>
+                <div className="products-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px" }}>
                   {filtered.map((p) => {
                     const imgs = getImages(p);
                     const thumb = imgs[0] ?? getFallbackImage(p);
@@ -1175,6 +1181,7 @@ export default function Home() {
 
                     return (
                       <div
+                        className="product-card"
                         key={p.id}
                         onClick={() => setSelectedProduct(p)}
                         style={{
@@ -1261,6 +1268,7 @@ export default function Home() {
                         </p>
 
                         <button
+                          className="details-btn"
                           onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }}
                           style={{
                             width: "100%", borderRadius: "999px",
@@ -1276,6 +1284,7 @@ export default function Home() {
                   })}
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
@@ -1296,6 +1305,144 @@ export default function Home() {
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+
+        .catalog-layout {
+          grid-template-columns: clamp(240px, 24vw, 300px) minmax(0, 1fr);
+          gap: clamp(14px, 2vw, 24px);
+        }
+
+        .filters-panel {
+          box-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+          backdrop-filter: blur(8px);
+        }
+
+        .filter-option {
+          transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .filter-option:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 8px 18px rgba(26, 35, 53, 0.08);
+        }
+
+        .products-toolbar {
+          box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
+        }
+
+        .products-grid {
+          grid-template-columns: repeat(auto-fit, minmax(clamp(180px, 22vw, 230px), 1fr)) !important;
+          gap: clamp(10px, 1.5vw, 18px) !important;
+        }
+
+        .product-card {
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .product-card:hover {
+          transform: translateY(-4px);
+          border-color: #d4defa !important;
+          box-shadow: 0 14px 28px rgba(17, 24, 39, 0.12) !important;
+        }
+
+        .details-btn {
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .details-btn:hover {
+          transform: translateY(-1px);
+          opacity: 0.94;
+        }
+
+        @media (max-width: 1024px) {
+          .catalog-layout {
+            grid-template-columns: clamp(220px, 30vw, 270px) minmax(0, 1fr);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .catalog-layout {
+            grid-template-columns: minmax(120px, 45%) minmax(0, 55%) !important;
+            gap: 10px !important;
+            grid-template-areas:
+              "filters toolbar"
+              "list list";
+            align-items: stretch !important;
+          }
+
+          .filters-panel {
+            grid-area: filters;
+            position: static !important;
+            top: auto !important;
+            padding: 12px !important;
+          }
+
+          .products-panel {
+            display: contents;
+          }
+
+          .products-toolbar {
+            grid-area: toolbar;
+            margin-bottom: 0 !important;
+            padding: 10px 12px !important;
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 8px;
+          }
+
+          .products-toolbar select {
+            width: 100%;
+            min-height: 38px;
+          }
+
+          .products-toolbar p {
+            font-size: 13px !important;
+            line-height: 1.3;
+          }
+
+          .products-list-wrap {
+            grid-area: list;
+            margin-top: 10px;
+          }
+
+          .products-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .filters-panel {
+            padding: 10px !important;
+          }
+
+          .filters-panel h3 {
+            font-size: 15px !important;
+          }
+
+          .filter-option {
+            padding: 7px 10px !important;
+            font-size: 13px !important;
+          }
+
+          .products-toolbar {
+            padding: 8px 10px !important;
+          }
+
+          .products-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .catalog-layout {
+            grid-template-columns: minmax(112px, 46%) minmax(0, 54%) !important;
+            gap: 8px !important;
+          }
+
+          .products-grid {
+            grid-template-columns: 1fr !important;
+          }
         }
       `}</style>
     </main>
