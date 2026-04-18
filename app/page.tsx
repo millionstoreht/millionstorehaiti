@@ -884,7 +884,7 @@ export default function Home() {
         if (selectedCategory !== "Tout" && p.category !== selectedCategory) return false;
         if (selectedBrand !== "Tout" && p.marque !== selectedBrand) return false;
         if (!q) return true;
-        const hay = `${p.marque} ${p.modele} ${p.description ?? ""} ${p.category}`.toLowerCase();
+        const hay = `${p.id} ${p.marque} ${p.modele} ${p.description ?? ""} ${p.category} ${p.serialImei ?? ""}`.toLowerCase();
         return hay.includes(q);
       })
       .sort((a, b) => {
@@ -955,20 +955,25 @@ export default function Home() {
         position: "sticky", top: 0, background: "#fff", zIndex: 1000,
         boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
       }}>
-        <div style={{ fontSize: "24px", fontWeight: "bold", color: "#e63946" }}>
+        <div style={{ fontSize: "24px", fontWeight: "bold", color: "#e63946", flexShrink: 0 }}>
           Million<span style={{ color: "#1a1a2e" }}>Store</span>
         </div>
-        <input
-          placeholder="Rechèch pwodui..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            padding: "10px 20px", borderRadius: "25px",
-            border: "1px solid #ddd", width: "40%", fontSize: "14px",
-            outline: "none",
-          }}
-        />
-        <div style={{ display: "flex", gap: "20px", fontSize: "24px" }}>
+        <div style={{ flex: 1, minWidth: 0, maxWidth: "720px", margin: "0 20px" }}>
+          <input
+            type="search"
+            placeholder="Rechèch (non, kategori, ID, IMEI/serial...)"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              boxSizing: "border-box",
+              width: "100%",
+              padding: "10px 20px", borderRadius: "25px",
+              border: "1px solid #ddd", fontSize: "14px",
+              outline: "none",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: "20px", fontSize: "24px", flexShrink: 0 }}>
           <span style={{ cursor: "pointer" }}>🤍</span>
           <span
             onClick={handleGoogleAuth}
