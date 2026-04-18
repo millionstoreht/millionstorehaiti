@@ -948,32 +948,30 @@ export default function Home() {
         </span>
       </div>
 
-      {/* Navbar */}
-      <nav style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "16px 24px", borderBottom: "1px solid #eee",
-        position: "sticky", top: 0, background: "#fff", zIndex: 1000,
-        boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
-      }}>
-        <div style={{ fontSize: "24px", fontWeight: "bold", color: "#e63946", flexShrink: 0 }}>
+      {/* Navbar — grid: sou phone rechèch anba, plen lajè; sou desktop menm liy */}
+      <nav
+        className="site-nav"
+        style={{
+          borderBottom: "1px solid #eee",
+          position: "sticky", top: 0, background: "#fff", zIndex: 1000,
+          boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div className="site-nav-brand" style={{ fontSize: "24px", fontWeight: "bold", color: "#e63946" }}>
           Million<span style={{ color: "#1a1a2e" }}>Store</span>
         </div>
-        <div style={{ flex: 1, minWidth: 0, maxWidth: "720px", margin: "0 20px" }}>
+        <div className="site-nav-search">
           <input
             type="search"
+            enterKeyHint="search"
+            autoComplete="off"
             placeholder="Rechèch (non, kategori, ID, IMEI/serial...)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              boxSizing: "border-box",
-              width: "100%",
-              padding: "10px 20px", borderRadius: "25px",
-              border: "1px solid #ddd", fontSize: "14px",
-              outline: "none",
-            }}
+            className="site-nav-search-input"
           />
         </div>
-        <div style={{ display: "flex", gap: "20px", fontSize: "24px", flexShrink: 0 }}>
+        <div className="site-nav-icons" style={{ display: "flex", gap: "20px", fontSize: "24px" }}>
           <span style={{ cursor: "pointer" }}>🤍</span>
           <span
             onClick={handleGoogleAuth}
@@ -1314,6 +1312,78 @@ export default function Home() {
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+
+        .site-nav {
+          display: grid;
+          gap: 10px 16px;
+          align-items: center;
+          padding: 16px 24px;
+          grid-template-areas:
+            "brand icons"
+            "search search";
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        @media (max-width: 768px) {
+          .site-nav {
+            padding: 12px 12px;
+            gap: 12px 12px;
+          }
+        }
+
+        .site-nav-brand {
+          grid-area: brand;
+          min-width: 0;
+        }
+
+        .site-nav-search {
+          grid-area: search;
+          min-width: 0;
+          width: 100%;
+        }
+
+        .site-nav-icons {
+          grid-area: icons;
+          justify-self: end;
+        }
+
+        .site-nav-search-input {
+          box-sizing: border-box;
+          width: 100%;
+          padding: 10px 14px;
+          border-radius: 8px;
+          border: 1px solid #ddd;
+          font-size: 16px;
+          outline: none;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        .site-nav-search-input::-webkit-search-decoration,
+        .site-nav-search-input::-webkit-search-cancel-button {
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        @media (min-width: 769px) {
+          .site-nav {
+            grid-template-areas: "brand search icons";
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: 0 20px;
+          }
+
+          .site-nav-search {
+            max-width: 720px;
+            width: 100%;
+            justify-self: stretch;
+          }
+
+          .site-nav-search-input {
+            border-radius: 25px;
+            padding: 10px 20px;
+            font-size: 14px;
+          }
         }
 
         .catalog-layout {
