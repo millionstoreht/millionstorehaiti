@@ -108,9 +108,8 @@ function PaymentModal({
   onPaymentConfirmed?: () => void;
 }) {
   const [step, setStep] = useState<"choose" | "moncash" | "natcash" | "bank" | "confirm">("choose");
+  const [selectedBank, setSelectedBank] = useState("BNC");
   const [showPaymentInfo, setShowPaymentInfo] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [ref, setRef] = useState("");
   const checkoutItems = products && products.length > 0 ? products : product ? [product] : [];
   const totalAmount = checkoutItems.reduce((sum, item) => sum + Number(item.prixVente || 0), 0);
   const isMultiCheckout = checkoutItems.length > 1;
@@ -135,25 +134,47 @@ function PaymentModal({
     bank: "Virement Bancaire",
   };
 
+  const BANK_DETAILS = {
+    BNC: {
+      holder: "Christian Hotes",
+      gourde: "27100 22696",
+      dollar: "27110 08200",
+    },
+    SOGEBANK: {
+      holder: "Christian Hotes",
+      gourde: "140130 0650",
+      dollar: "141113 6144",
+    },
+    BUH: {
+      holder: "Christian Hotes",
+      gourde: "310000 17984",
+      dollar: "310000 17992",
+    },
+    UNIBANK: {
+      holder: "Christian Hotes",
+      gourde: "1802015 289989 36",
+      dollar: "1802016 289990 39",
+    },
+  } as const;
+
   const activeColor = step !== "choose" && step !== "confirm" ? METHOD_COLORS[step] : "#1a1a2e";
 
   const handleConfirmPayment = (method: "moncash" | "natcash" | "bank") => {
     setStep("confirm");
     onPaymentConfirmed?.();
 
-    const paymentRef = ref.trim() || "Pa bay referans";
-    const buyerPhone = phone.trim() || "Pa bay nimewo";
     const itemLines = checkoutItems
       .map(
         (item, index) =>
           `${index + 1}. ${item.marque} ${item.modele} - $${Number(item.prixVente).toLocaleString()}`
       )
       .join("%0A");
+    const bankLine = method === "bank" ? `%0ABank chwazi: ${selectedBank}` : "";
     const message =
-      `Bonjou MillionStore,%0A%0AMwen fek konfime yon peman.%0A%0A` +
+      `Bonjou MillionStore,%0A%0AGen yon kliyan ki peye.%0A%0A` +
       `Metod: ${METHOD_LABELS[method]}%0A` +
-      `Telefon kliyan: ${buyerPhone}%0A` +
-      `Referans tranzaksyon: ${paymentRef}%0A%0A` +
+      `${bankLine ? `${bankLine}%0A` : ""}` +
+      `%0A%0A` +
       `Pwodwi yo:%0A${itemLines}%0A%0ATotal: $${Number(totalAmount).toLocaleString()}`;
 
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, "_blank", "noopener,noreferrer");
@@ -272,9 +293,9 @@ function PaymentModal({
                 </p>
                 <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>1) Chwazi metòd ou vle a (MonCash, NatCash, oswa Bank).</p>
                 <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>2) Fè transfè a sou nimewo/kont ki parèt la.</p>
-                <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>3) Retounen mete nimewo telefòn ou ak referans tranzaksyon an.</p>
+                <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>3) Retounen klike sou <strong>Konfime peman an</strong>.</p>
                 <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>4) Klike <strong>Konfime peman an</strong>, nou verifye epi nou kontakte ou.</p>
-                <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>5) Se ou k ap fè tranzaksyon manyèl apre w ap ekri nimewo phone nan ak nimewo tranzaksyon an, oubyen ou voye foto kote ou fè transfè a pou nou.</p>
+                <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>5) Si sa nesese, ou ka voye prèv transfè a sou WhatsApp pou ekip la verifye pi vit.</p>
                 <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>6) Ou ka ekri nou sou WhatsApp oubyen pase nan lokal nou pou plis infos.</p>
                 <p style={{ margin: 0, fontSize: "13px", color: "#555" }}>7) Full garanti: si pwodwi a ba w pwoblèm, n ap vin chanje li pou ou oubyen ranbouse w lajan ou.</p>
               </div>
@@ -313,36 +334,6 @@ function PaymentModal({
               <p style={{ fontSize: "12px", color: "#888", margin: "6px 0 0" }}>Non: Christian Hotes</p>
             </div>
 
-            <label style={{ fontSize: "13px", color: "#888", display: "block", marginBottom: "6px" }}>
-              Nimewo telefòn ou ({METHOD_LABELS[step]})
-            </label>
-            <input
-              type="tel"
-              placeholder="Ex: 509 XX XX XXXX"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              style={{
-                width: "100%", padding: "10px 12px", borderRadius: "10px",
-                border: "1px solid #ddd", fontSize: "14px",
-                boxSizing: "border-box", marginBottom: "12px", outline: "none",
-              }}
-            />
-
-            <label style={{ fontSize: "13px", color: "#888", display: "block", marginBottom: "6px" }}>
-              Referans / kòd tranzaksyon
-            </label>
-            <input
-              type="text"
-              placeholder="Nimewo referans ou jwenn nan aplikasyon an"
-              value={ref}
-              onChange={(e) => setRef(e.target.value)}
-              style={{
-                width: "100%", padding: "10px 12px", borderRadius: "10px",
-                border: "1px solid #ddd", fontSize: "14px",
-                boxSizing: "border-box", marginBottom: "16px", outline: "none",
-              }}
-            />
-
             <button
               onClick={() => handleConfirmPayment(step)}
               style={{
@@ -380,32 +371,42 @@ function PaymentModal({
               <p style={{ fontSize: "12px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 10px" }}>
                 Enfòmasyon kont bank
               </p>
+              <div style={{ marginBottom: "12px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#888" }}>Chwazi bank la:</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {Object.keys(BANK_DETAILS).map((bankName) => (
+                    <button
+                      key={bankName}
+                      type="button"
+                      onClick={() => setSelectedBank(bankName)}
+                      style={{
+                        border: selectedBank === bankName ? "1px solid #1D5F2B" : "1px solid #ddd",
+                        background: selectedBank === bankName ? "#eaf6ed" : "#fff",
+                        color: selectedBank === bankName ? "#1D5F2B" : "#333",
+                        borderRadius: "999px",
+                        padding: "6px 12px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {bankName}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {[
-                ["Non titilè", "MillionStore Haiti"],
-                ["Bank", "BNC / Sogebank"],
-                ["Nimewo kont", "XXX-XXXX-XX"],
+                ["Bank", selectedBank],
+                ["Nom du titulaire", BANK_DETAILS[selectedBank as keyof typeof BANK_DETAILS].holder],
+                ["Compte gourde", BANK_DETAILS[selectedBank as keyof typeof BANK_DETAILS].gourde],
+                ["Compte dollar", BANK_DETAILS[selectedBank as keyof typeof BANK_DETAILS].dollar],
               ].map(([label, val]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: "13px" }}>
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: "13px", gap: "12px" }}>
                   <span style={{ color: "#888" }}>{label}</span>
-                  <span style={{ fontWeight: 700, color: "#111" }}>{val}</span>
+                  <span style={{ fontWeight: 700, color: "#111", textAlign: "right" }}>{val}</span>
                 </div>
               ))}
             </div>
-
-            <label style={{ fontSize: "13px", color: "#888", display: "block", marginBottom: "6px" }}>
-              Nimewo referans virement ou
-            </label>
-            <input
-              type="text"
-              placeholder="Referans bank ou"
-              value={ref}
-              onChange={(e) => setRef(e.target.value)}
-              style={{
-                width: "100%", padding: "10px 12px", borderRadius: "10px",
-                border: "1px solid #ddd", fontSize: "14px",
-                boxSizing: "border-box", marginBottom: "16px", outline: "none",
-              }}
-            />
 
             <button
               onClick={() => handleConfirmPayment("bank")}
