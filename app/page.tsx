@@ -1030,10 +1030,7 @@ export default function Home() {
           📞 Apèl dirèk: +509 35012813
         </a>
         <br/>
-        <a href="tel:+50956739901" style={{ display: "inline-flex", alignItems: "center", gap: "8px", margin: "0 0 8px", color: "#1a6fc4", fontSize: "18px", textDecoration: "none", fontWeight: 500 }}>
-          📞 Apèl dirèk: +509 56 73 99 01
-        </a>
-        <br/>
+        
         <a href="mailto:millionstorehaiti@gmail.com" style={{ display: "inline-flex", alignItems: "center", gap: "8px", margin: "0 0 28px", color: "#1a6fc4", fontSize: "18px", textDecoration: "none", fontWeight: 500 }}>
           ✉️ millionstorehaiti@gmail.com
         </a>
