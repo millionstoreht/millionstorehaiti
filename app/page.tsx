@@ -8,7 +8,7 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import { collectionGroup, onSnapshot, query } from "firebase/firestore";
+import { collectionGroup, onSnapshot, query, doc, getDoc } from "firebase/firestore";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 interface Product {
@@ -775,6 +775,7 @@ export default function Home() {
   const [showCart, setShowCart] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
   const [checkoutProducts, setCheckoutProducts] = useState<Product[] | null>(null);
+  const [taux, setTaux] = useState<number>(1);
 
   const handleAddToCart = (product: Product) => {
     setCart((prev) => [...prev, product]);
@@ -865,6 +866,17 @@ export default function Home() {
     }
   }, [cart]);
 
+  useEffect(() => {
+  const fetchTaux = async () => {
+    try {
+      const snap = await getDoc(doc(db, "parametres", "taux"));
+      const val = snap.data()?.taux;
+      if (val && Number(val) > 0) setTaux(Number(val));
+    } catch (_) {}
+  };
+  fetchTaux();
+}, []);
+
   const categories = useMemo(() => {
     const cats = Array.from(new Set(products.map((p) => p.category ?? "Lòt")));
     return ["Tout", ...cats.sort()];
@@ -934,7 +946,7 @@ export default function Home() {
         background: "#1a1a2e", color: "#fff", textAlign: "center",
         padding: "10px", fontSize: "14px",
       }}>
-        🚀 Livrezon disponib toupatou ann Ayiti — !
+        🚀 Livrezon disponib — !
         <span style={{
           marginLeft: "16px", display: "inline-flex", alignItems: "center", gap: "6px",
           background: "rgba(255,255,255,0.1)", borderRadius: "20px", padding: "2px 10px",
@@ -1039,6 +1051,12 @@ export default function Home() {
           vini Achte Kounye a
         </button>
       </section>
+
+      {taux > 1 && (
+  <p style={{ margin: "16px 0 0", color: "#1a1a2e", fontSize: "16px", fontWeight: 700 }}>
+    💱 Taux du jour: 1$ = {taux} HTG
+  </p>
+)}
 
       {/* Kontni prensipal */}
       <section style={{ padding: "40px 24px", maxWidth: "1200px", margin: "0 auto" }}>
