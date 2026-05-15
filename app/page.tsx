@@ -25,22 +25,20 @@ interface Product {
   serialImei?: string;
 }
 
-// ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const MARQUE_LOGOS: Record<string, string> = {
-  hp: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/HP_logo_2012.svg/800px-HP_logo_2012.svg.png",
-  dell: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Dell_Logo.svg/1280px-Dell_Logo.svg.png",
-  lenovo: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Lenovo_logo_2015.svg/1280px-Lenovo_logo_2015.svg.png",
-  apple: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/800px-Apple_logo_black.svg.png",
-  iphone: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/800px-Apple_logo_black.svg.png",
-  samsung: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Samsung_Logo.svg/1280px-Samsung_Logo.svg.png",
-  asus: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/ASUS_Logo.svg/1280px-ASUS_Logo.svg.png",
-  acer: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Acer_2011.svg/1280px-Acer_2011.svg.png",
-  microsoft: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Microsoft_logo.svg/1280px-Microsoft_logo.svg.png",
-  huawei: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Huawei_Logo.svg/1280px-Huawei_Logo.svg.png",
-  xiaomi: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Xiaomi_logo.svg/1280px-Xiaomi_logo.svg.png",
-  toshiba: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Toshiba_logo.svg/1280px-Toshiba_logo.svg.png",
+  hp: "https://cdn.worldvectorlogo.com/logos/hp-2.svg",
+  dell: "https://cdn.worldvectorlogo.com/logos/dell-2.svg",
+  lenovo: "https://cdn.worldvectorlogo.com/logos/lenovo-2.svg",
+  apple: "https://cdn.worldvectorlogo.com/logos/apple-1.svg",
+  iphone: "https://cdn.worldvectorlogo.com/logos/apple-1.svg",
+  samsung: "https://cdn.worldvectorlogo.com/logos/samsung-4.svg",
+  asus: "https://cdn.worldvectorlogo.com/logos/asus-1.svg",
+  acer: "https://cdn.worldvectorlogo.com/logos/acer-2.svg",
+  microsoft: "https://cdn.worldvectorlogo.com/logos/microsoft-1.svg",
+  huawei: "https://cdn.worldvectorlogo.com/logos/huawei-1.svg",
+  xiaomi: "https://cdn.worldvectorlogo.com/logos/xiaomi-3.svg",
+  toshiba: "https://cdn.worldvectorlogo.com/logos/toshiba.svg",
 };
-
 const CAT_IMAGES: Record<string, string> = {
   Phone: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400",
   Ordinateur: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400",
