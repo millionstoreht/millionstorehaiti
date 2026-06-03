@@ -25,6 +25,7 @@ interface MenuItem {
   color: string;
   href: string;
   permKey?: string;
+  adminOnly?: boolean;
 }
 
 const MENU_ITEMS: MenuItem[] = [
@@ -82,6 +83,7 @@ export default function DashboardPage() {
   const canSee = (item: MenuItem): boolean => {
     if (!user) return false;
     if (user.isAdmin) return true;
+    if (item.adminOnly) return false;
     if (item.permKey) return user.permissions[item.permKey] === true;
     return false;
   };
