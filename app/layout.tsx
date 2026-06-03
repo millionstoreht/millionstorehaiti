@@ -18,6 +18,13 @@ export const metadata: Metadata = {
   verification: {
     google: "q0Gz-4UAT2WjLrXEq_BrFJkher876tD71-5zVG5bnEI",
   },
+  manifest: "/manifest.json",
+  themeColor: "#1a1a2e",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "MillionStore",
+  },
 };
 
 export default function RootLayout({
@@ -27,10 +34,29 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#1a1a2e" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="MillionStore" />
+        <link rel="apple-touch-icon" href="https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg" />
+      </head>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js');
+              });
+            }
+          `
+        }} />
+      </body>
     </html>
   );
 }
