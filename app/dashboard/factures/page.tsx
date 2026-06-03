@@ -1460,7 +1460,7 @@ function EditPrixModal({ prix, devise, onSave, onClose, label }: { prix: number;
 function StatPill({ icon, color, label }: { icon: React.ReactNode; color: string; label: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 8, background: `${color}26` }}>
-      {React.cloneElement(icon as React.ReactElement, { color })}
+      {React.cloneElement(icon as React.ReactElement<{ color?: string }>, { color })}
       <span style={{ color, fontSize: 11, fontWeight: 700 }}>{label}</span>
     </div>
   );
@@ -1469,7 +1469,7 @@ function StatPill({ icon, color, label }: { icon: React.ReactNode; color: string
 function SectionHeader({ icon, color, label, count }: { icon: React.ReactNode; color: string; label: string; count: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-      {React.cloneElement(icon as React.ReactElement, { color })}
+      {React.cloneElement(icon as React.ReactElement<{ color?: string }>, { color })}
       <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1D2E" }}>{label}</span>
       <span style={{ background: `${color}26`, color, fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8 }}>{count}</span>
     </div>
