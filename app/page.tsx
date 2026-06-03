@@ -22,7 +22,7 @@ interface QuickButton {
   id: string;
   label: string;
   icon: string;
-  action: "filter" | "url" | "whatsapp" | "phone" | "scroll";
+  action: "filter" | "url" | "whatsapp" | "phone" | "scroll" | string;
   value: string;
   active: boolean;
 }

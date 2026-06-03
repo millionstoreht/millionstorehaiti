@@ -24,7 +24,7 @@ interface UserSession {
 interface CustomButton {
   id: string;
   label: string;
-  action: "url" | "whatsapp" | "phone" | "email" | "modal";
+  action: "url" | "whatsapp" | "phone" | "email" | "modal" | string;
   value: string;
   color: string;
   icon: string;

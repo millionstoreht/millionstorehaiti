@@ -334,7 +334,7 @@ function RezimeTab({ filtered, totVente, totBenef, taux }: {
               <BarChart data={chartData} barCategoryGap="30%">
                 <XAxis dataKey="name" tick={{ fill:"rgba(255,255,255,0.38)", fontSize:9 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
-                <Tooltip contentStyle={{ background:"#1A1D2E", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff" }} formatter={(v: number) => [`$${v.toFixed(2)}`, "Vente"]} />
+                <Tooltip contentStyle={{ background:"#1A1D2E", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff" }} formatter={(v) => [`$${Number(v ?? 0).toFixed(2)}`, "Vente"]} />
                 <Bar dataKey="value" radius={[6,6,0,0]} fill="#FF9800" />
               </BarChart>
             </ResponsiveContainer>
@@ -559,7 +559,7 @@ function VendeurTab({ filtered, vendeurs }: { filtered: Facture[]; vendeurs: Ven
             <BarChart data={chartData} barCategoryGap="30%">
               <XAxis dataKey="name" tick={{ fill:"rgba(255,255,255,0.38)", fontSize:9 }} axisLine={false} tickLine={false} />
               <YAxis hide />
-              <Tooltip contentStyle={{ background:"#1A1D2E", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff" }} formatter={(v: number) => [`$${v.toFixed(2)}`, "Vente"]} />
+              <Tooltip contentStyle={{ background:"#1A1D2E", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff" }} formatter={(v) => [`$${Number(v ?? 0).toFixed(2)}`, "Vente"]} />
               <Bar dataKey="value" radius={[6,6,0,0]}>
                 {chartData.map((_, i) => <Cell key={i} fill={col(i)} />)}
               </Bar>
@@ -630,7 +630,7 @@ function BigCard({ label, value, icon, color }: { label: string; value: string; 
   return (
     <div style={{ background:`${color}14`, border:`1px solid ${color}40`, borderRadius:16, padding:14 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-        {React.cloneElement(icon as React.ReactElement, { color })}
+        {React.cloneElement(icon as React.ReactElement<{ color?: string }>, { color })}
         <span style={{ color, fontWeight:700, fontSize:15 }}>{value}</span>
       </div>
       <div style={{ color:"rgba(255,255,255,0.38)", fontSize:11 }}>{label}</div>
