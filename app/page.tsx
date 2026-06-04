@@ -844,7 +844,7 @@ const [showGarantie, setShowGarantie] = useState(false);
                       <span style={{ background: `${color}18`, color, padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 700 }}>{p.category}</span>
                       {logo && <img src={logo} alt={p.marque} style={{ height: "14px", objectFit: "contain" }} />}
                     </div>
-                    <p style={{ margin: "0 0 4px", color: "#555", fontSize: "12px", fontWeight: 700 }}>🔖 ID: {p.id}</p>
+                    <p style={{ margin: "0 0 4px", color: "#333", fontSize: "12px", fontWeight: 700 }}>🔖 ID: {p.id}</p>
                     <h3 style={{ margin: "0 0 4px", fontSize: "13px", color: "#111820", lineHeight: 1.3, fontWeight: 700 }}>{p.marque} {p.modele}</h3>
                     {p.description && <p style={{ margin: "0 0 6px", color: "#888", fontSize: "11px", lineHeight: 1.3 }}>{p.description.length > 50 ? p.description.slice(0, 50) + "…" : p.description}</p>}
                     <p style={{ margin: "0 0 8px", color: "#111", fontWeight: 800, fontSize: "17px" }}>${Number(p.prixVente).toLocaleString()}</p>
