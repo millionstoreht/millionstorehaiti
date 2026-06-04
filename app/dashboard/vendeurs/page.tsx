@@ -103,6 +103,41 @@ export default function VendeursPage() {
   // ─── LOAD VENDEURS ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
+
+    if (localId === "all") {
+      // Admin: chaje vendeurs nan TOUT locals
+      const fetchAll = async () => {
+        try {
+          const localsSnap = await getDocs(collection(db, "locals"));
+          const allVendeurs: Vendeur[] = [];
+
+          for (const localDoc of localsSnap.docs) {
+            if (localDoc.id === "all") continue; // skip doc config
+            const vendSnap = await getDocs(
+              collection(db, "locals", localDoc.id, "vendeurs")
+            );
+            vendSnap.forEach(d => {
+              const data = d.data();
+              allVendeurs.push({
+                id:      d.id,
+                nom:     data.nom ?? "",
+                balance: Number(data.balance ?? 0),
+                ventes:  data.ventes ?? [],
+                localId: localDoc.id, // ← sove vrè localId a
+              });
+            });
+          }
+          setVendeurs(allVendeurs);
+          setLoading(false);
+        } catch {
+          setLoading(false);
+        }
+      };
+      fetchAll();
+      return;
+    }
+
+    // Non-admin: chaje pa localId ak realtime
     const colRef = collection(db, "locals", localId, "vendeurs");
     const unsub = onSnapshot(colRef, snap => {
       const list: Vendeur[] = [];
@@ -113,13 +148,14 @@ export default function VendeursPage() {
           nom:     data.nom ?? "",
           balance: Number(data.balance ?? 0),
           ventes:  data.ventes ?? [],
-          localId: data.localId,
+          localId: localId, // ← sove vrè localId a
         });
       });
       setVendeurs(list);
       setLoading(false);
     }, () => setLoading(false));
     return () => unsub();
+
   }, [user, localId]);
 
   // ─── STATS ───────────────────────────────────────────────────────────────
@@ -131,6 +167,8 @@ export default function VendeursPage() {
   // ─── ACTIONS ─────────────────────────────────────────────────────────────
   const addVendeur = async () => {
     if (!newNom.trim()) return;
+    // Admin ki gen localId "all" pa ka ajoute san chwazi yon local
+    if (localId === "all") return;
     const v: Vendeur = {
       id:      Date.now().toString(),
       nom:     newNom.trim(),
@@ -143,7 +181,8 @@ export default function VendeursPage() {
   };
 
   const payVendeur = async (v: Vendeur) => {
-    await setDoc(doc(db, "locals", localId, "vendeurs", v.id),
+    const lid = v.localId ?? localId; // ← sèvi ak vrè localId vendeur a
+    await setDoc(doc(db, "locals", lid, "vendeurs", v.id),
       { ...v, balance: 0 });
     setShowPayModal(null);
   };
@@ -151,22 +190,25 @@ export default function VendeursPage() {
   const saveBalance = async (v: Vendeur) => {
     const val = parseFloat(newBalance);
     if (isNaN(val)) return;
-    await setDoc(doc(db, "locals", localId, "vendeurs", v.id),
+    const lid = v.localId ?? localId; // ← sèvi ak vrè localId vendeur a
+    await setDoc(doc(db, "locals", lid, "vendeurs", v.id),
       { ...v, balance: val });
     setShowBalanceModal(null); setNewBalance("");
   };
 
   const deleteVendeur = async (v: Vendeur) => {
-    await deleteDoc(doc(db, "locals", localId, "vendeurs", v.id));
+    const lid = v.localId ?? localId; // ← sèvi ak vrè localId vendeur a
+    await deleteDoc(doc(db, "locals", lid, "vendeurs", v.id));
     setShowDeleteModal(null);
   };
 
   const removeVente = async (v: Vendeur, vente: Vente) => {
+    const lid = v.localId ?? localId; // ← sèvi ak vrè localId vendeur a
     const newVentes = v.ventes.filter(x =>
       !(x.billNo === vente.billNo && x.id === vente.id));
     const gain = Number(vente.gainTotal ?? 0);
     const newBal = Math.max(0, v.balance - gain);
-    await setDoc(doc(db, "locals", localId, "vendeurs", v.id),
+    await setDoc(doc(db, "locals", lid, "vendeurs", v.id),
       { ...v, ventes: newVentes, balance: newBal });
     setSelectedVendeur(prev =>
       prev ? { ...prev, v: { ...prev.v, ventes: newVentes, balance: newBal } } : null);
@@ -216,7 +258,7 @@ export default function VendeursPage() {
               ⚙️ Komisyon
             </button>
           )}
-          {user.isAdmin && (
+          {user.isAdmin && localId !== "all" && (
             <button onClick={() => setShowAddModal(true)}
               style={{ background:"rgba(0,200,83,0.15)", border:"1px solid #00C853",
                 color:"#00C853", padding:"8px 14px", borderRadius:10,
@@ -323,6 +365,11 @@ export default function VendeursPage() {
                       <p style={{ margin:0, fontWeight:700, fontSize:14 }}>{v.nom}</p>
                       <p style={{ margin:"2px 0 0", color:"#555", fontSize:11 }}>
                         {activeVentes.length} vant • Total gagnen: ${totalGagne.toFixed(2)}
+                        {localId === "all" && v.localId && (
+                          <span style={{ marginLeft:6, color:"#2979FF", fontSize:10 }}>
+                            [{v.localId}]
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div style={{ textAlign:"right" }}>
@@ -361,7 +408,7 @@ export default function VendeursPage() {
             <div style={{ textAlign:"center", marginTop:80 }}>
               <div style={{ fontSize:64, opacity:0.2 }}>👥</div>
               <p style={{ color:"#555" }}>Pa gen vendeur toujou</p>
-              {user.isAdmin && (
+              {user.isAdmin && localId !== "all" && (
                 <button onClick={() => setShowAddModal(true)}
                   style={{ background:"#00C853", border:"none", color:"#fff",
                     padding:"12px 24px", borderRadius:12, cursor:"pointer",
@@ -388,7 +435,14 @@ export default function VendeursPage() {
                     </div>
                     <div style={{ flex:1 }}>
                       <p style={{ margin:0, fontWeight:700, fontSize:15 }}>{v.nom}</p>
-                      <p style={{ margin:"2px 0 0", color:"#555", fontSize:12 }}>{active.length} vant</p>
+                      <p style={{ margin:"2px 0 0", color:"#555", fontSize:12 }}>
+                        {active.length} vant
+                        {localId === "all" && v.localId && (
+                          <span style={{ marginLeft:6, color:"#2979FF", fontSize:10 }}>
+                            [{v.localId}]
+                          </span>
+                        )}
+                      </p>
                     </div>
                     <div style={{ textAlign:"right" }}>
                       <p style={{ margin:0, color, fontWeight:700, fontSize:16 }}>
@@ -484,7 +538,14 @@ export default function VendeursPage() {
                   </div>
                   <div>
                     <p style={{ margin:0, fontWeight:700, fontSize:16 }}>{v.nom}</p>
-                    <p style={{ margin:0, color:"#555", fontSize:12 }}>{active.length} vant</p>
+                    <p style={{ margin:0, color:"#555", fontSize:12 }}>
+                      {active.length} vant
+                      {localId === "all" && v.localId && (
+                        <span style={{ marginLeft:6, color:"#2979FF", fontSize:11 }}>
+                          [{v.localId}]
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div style={{ display:"flex", gap:8 }}>
