@@ -28,9 +28,9 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MillionStore Haiti",
     description: "Achte òdinatè, telefòn ak akseswa teknoloji ann Ayiti. Livrezon rapid toupatou.",
-    url: "https://millionstore509.vercel.app",
+    url: "https://millionstorehaiti.vercel.app",
     siteName: "MillionStore Haiti",
-    images: [{ url: "https://millionstore509.vercel.app/og-laptop.jpg", width: 1200, height: 630 }],
+    images: [{ url: "https://millionstorehaiti.vercel.app/og-laptop.jpg", width: 1200, height: 630 }],
   },
 };
 
