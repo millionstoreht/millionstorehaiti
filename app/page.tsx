@@ -14,6 +14,7 @@ interface Product {
   imagePath?: string;
   imagePaths?: string[];
   description?: string;
+  map?: string; 
   isDeleted?: boolean;
   serialImei?: string;
 }
@@ -82,6 +83,75 @@ function getMarqueLogo(marque: string): string | null {
 }
 function getFallbackImage(p: Product): string { return CAT_IMAGES[p.category] ?? CAT_IMAGES["Lòt"]; }
 function getCatColor(cat: string): string { return CAT_COLORS[cat] ?? "#636E72"; }
+
+// ─── GOOGLE LOGIN MODAL ───────────────────────────────────────────────────────
+function GoogleLoginModal({ onClose, onSuccess }: {
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleGoogle = async () => {
+    setLoading(true); setError("");
+    try {
+      const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
+      const { auth } = await import("../lib/firebase");
+      const { doc, getDoc, setDoc } = await import("firebase/firestore");
+      const { db } = await import("../lib/firebase");
+
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const clientRef = doc(db, "clients", user.uid);
+      const clientSnap = await getDoc(clientRef);
+      if (!clientSnap.exists()) {
+        await setDoc(clientRef, {
+          uid: user.uid, nom: user.displayName ?? "", email: user.email ?? "",
+          photo: user.photoURL ?? "", telephone: "", adres: "",
+          createdAt: new Date().toISOString(), type: "client",
+        });
+      }
+      const clientSession = {
+        uid: user.uid, nom: user.displayName ?? "",
+        email: user.email ?? "", photo: user.photoURL ?? "", type: "client"
+      };
+      localStorage.setItem("ms_client_user", JSON.stringify(clientSession));
+      onSuccess();
+    } catch (e: any) {
+      setError("Erè Google. Eseye ankò.");
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "24px", width: "100%", maxWidth: "360px", padding: "32px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: "48px", marginBottom: "8px" }}>🛒</div>
+        <h2 style={{ margin: "0 0 6px", fontSize: "20px", fontWeight: 900, color: "#1a1a2e" }}>Konekte pou achte</h2>
+        <p style={{ margin: "0 0 24px", fontSize: "13px", color: "#888", lineHeight: 1.5 }}>
+          Itilize kont Google ou pou kontinye achte nan MillionStore
+        </p>
+        {error && (
+          <div style={{ background: "#fff0f0", color: "#e63946", padding: "10px 12px", borderRadius: "10px", fontSize: "12px", marginBottom: "16px" }}>❌ {error}</div>
+        )}
+        <button onClick={handleGoogle} disabled={loading}
+          style={{ width: "100%", padding: "14px", background: "#fff", color: "#333", border: "2px solid #e0e0e0", borderRadius: "14px", fontSize: "15px", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontFamily: "inherit", marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: "22px", height: "22px" }} />
+          {loading ? "Koneksyon..." : "Se connecter avec Google"}
+        </button>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "13px", cursor: "pointer", fontFamily: "inherit" }}>Anile</button>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
 function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConfig = {} }: {
@@ -302,6 +372,7 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {} }: {
 }) {
   const [imgIdx, setImgIdx] = useState(0);
   const [showPayment, setShowPayment] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
   const imgs  = getImages(product);
   const logo  = getMarqueLogo(product.marque);
   const color = getCatColor(product.category);
@@ -340,22 +411,37 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {} }: {
           {logo && <img src={logo} alt={product.marque} style={{ height: "20px", objectFit: "contain" }} />}
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#111" }}>{product.marque} {product.modele}</h2>
         </div>
-        {product.description && <p style={{ color: "#555", fontSize: "14px", lineHeight: 1.6, margin: "8px 0" }}>{product.description}</p>}
+        {product.description && (
+  <p style={{ color: "#555", fontSize: "14px", lineHeight: 1.6, margin: "8px 0" }}>
+    {product.description}
+  </p>
+)}
+{product.map && (
+  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", margin: "8px 0" }}>
+    <span style={{ fontSize: "14px", flexShrink: 0 }}>ℹ️</span>
+    <p style={{ color: "#7c3aed", fontSize: "14px", lineHeight: 1.6, margin: 0 }}>
+      {product.map}
+    </p>
+  </div>
+)}
         <p style={{ fontSize: "32px", fontWeight: 800, color: "#111", margin: "8px 0 4px" }}>${Number(product.prixVente).toLocaleString()}</p>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: product.stock <= 2 ? "#fff3e0" : "#e8f5e9", color: product.stock <= 2 ? "#e65100" : "#2e7d32", padding: "4px 12px", borderRadius: "999px", fontSize: "13px", fontWeight: 600, marginBottom: "20px" }}>
           {product.stock <= 2 ? `⚠️ Seulement ${product.stock} restant!` : `✅ ${product.stock} en stock`}
         </div>
 
         {/* Bouton */}
-        <button
+        {showGoogleModal && (
+  <GoogleLoginModal
+    onClose={() => setShowGoogleModal(false)}
+    onSuccess={() => { setShowGoogleModal(false); setShowPayment(true); }}
+  />
+)}
+<button
   onClick={(e) => {
     e.stopPropagation();
-    // Verifye si kliyan konekte
     const clientRaw = localStorage.getItem("ms_client_user");
     if (!clientRaw) {
-      // Pa konekte — ale login
-      localStorage.setItem("ms_redirect_after_login", window.location.href);
-      window.location.href = "/login";
+      setShowGoogleModal(true);
       return;
     }
     setShowPayment(true);
@@ -512,6 +598,8 @@ export default function Home() {
   const [siteConfig, setSiteConfig] = useState<Record<string, any>>({});
   const [quickButtons, setQuickButtons] = useState<QuickButton[]>(DEFAULT_QUICK_BUTTONS);
   const [showDrawer, setShowDrawer] = useState(false);
+  const [showGoogleForCart, setShowGoogleForCart] = useState(false);
+const [pendingCartProduct, setPendingCartProduct] = useState<Product | null>(null);
   const [showCategories, setShowCategories] = useState(false);
   const [showLivraison, setShowLivraison] = useState(false);
 const [showGarantie, setShowGarantie] = useState(false);
@@ -597,16 +685,20 @@ const [showGarantie, setShowGarantie] = useState(false);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
+    // Separe mo yo — "dell i7" → ["dell", "i7"]
+    const terms = q.split(/\s+/).filter(Boolean);
+    
     return products.filter((p) => {
       if (selectedCategory !== "Tout" && p.category !== selectedCategory) return false;
-      // Filtre spécial
       if (sortBy === "special") {
-        const hay = `${p.marque} ${p.modele} ${p.description ?? ""}`.toLowerCase();
+        const hay = `${p.marque} ${p.modele} ${p.description ?? ""} ${p.map ?? ""}`.toLowerCase();
         if (!hay.includes("special")) return false;
       }
       if (!q) return true;
-      const hay = `${p.id} ${p.marque} ${p.modele} ${p.description ?? ""} ${p.category} ${p.serialImei ?? ""}`.toLowerCase();
-      return hay.includes(q);
+      // Tout champ yo ansanm nan yon sèl tekstè
+      const hay = `${p.id} ${p.marque} ${p.modele} ${p.description ?? ""} ${p.map ?? ""} ${p.category} ${p.serialImei ?? ""}`.toLowerCase();
+      // Chak mo dwe jwenn yon kote nan tekstè a (kèlkeswa lòd)
+      return terms.every(term => hay.includes(term));
     })
     .sort((a, b) => {
       if (sortBy === "priceAsc") return Number(a.prixVente) - Number(b.prixVente);
@@ -652,10 +744,39 @@ const [showGarantie, setShowGarantie] = useState(false);
 
       {/* Modals */}
       {selectedProduct && <ProductModal product={selectedProduct} siteConfig={siteConfig} onClose={() => setSelectedProduct(null)} onAddToCart={(p) => setCart(prev => [...prev, p])} />}
-      {showCart && <CartModal cart={cart} siteConfig={siteConfig} onClose={() => setShowCart(false)} onRemoveItem={(i) => setCart(prev => prev.filter((_, idx) => idx !== i))} onCheckout={(p) => { setShowCart(false); setCheckoutProducts(null); setCheckoutProduct(p); }} onCheckoutAll={() => { if (!cart.length) return; setShowCart(false); setCheckoutProduct(null); setCheckoutProducts(cart); }} />}
+      {showCart && <CartModal cart={cart} siteConfig={siteConfig} onClose={() => setShowCart(false)} onRemoveItem={(i) => setCart(prev => prev.filter((_, idx) => idx !== i))} onCheckout={(p) => {
+  setShowCart(false);
+  const client = localStorage.getItem("ms_client_user");
+  if (!client) { setPendingCartProduct(p); setShowGoogleForCart(true); return; }
+  setCheckoutProducts(null);
+  setCheckoutProduct(p);
+}} onCheckoutAll={() => {
+  if (!cart.length) return;
+  setShowCart(false);
+  const client = localStorage.getItem("ms_client_user");
+  if (!client) { setPendingCartProduct(null); setShowGoogleForCart(true); return; }
+  setCheckoutProduct(null);
+  setCheckoutProducts(cart);
+}} />}
       {checkoutProduct && <PaymentModal product={checkoutProduct} siteConfig={siteConfig} onClose={() => setCheckoutProduct(null)} onPaymentConfirmed={() => setCart([])} />}
       {checkoutProducts && <PaymentModal products={checkoutProducts} siteConfig={siteConfig} onClose={() => setCheckoutProducts(null)} onPaymentConfirmed={() => setCart([])} />}
       {showDrawer && <DrawerMenu onClose={() => setShowDrawer(false)} siteConfig={siteConfig} categories={categories} onFilterCategory={setSelectedCategory} />}
+      {showGoogleForCart && (
+  <GoogleLoginModal
+    onClose={() => { setShowGoogleForCart(false); setPendingCartProduct(null); }}
+    onSuccess={() => {
+      setShowGoogleForCart(false);
+      if (pendingCartProduct) {
+        setCheckoutProducts(null);
+        setCheckoutProduct(pendingCartProduct);
+      } else {
+        setCheckoutProduct(null);
+        setCheckoutProducts(cart);
+      }
+      setPendingCartProduct(null);
+    }}
+  />
+)}
       {showCategories && (
   <div onClick={() => setShowCategories(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
     <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", maxHeight: "70vh", overflow: "auto", padding: "20px" }}>
@@ -874,10 +995,22 @@ const [showGarantie, setShowGarantie] = useState(false);
         </button>
 
         {/* Mon Compte */}
-        <button onClick={() => { const raw = localStorage.getItem("ms_web_user"); window.location.href = raw ? "/dashboard" : "/login"; }} style={{ flex: 1, padding: "10px 8px", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
-          <span style={{ fontSize: "20px" }}>{mounted && isLoggedIn ? "✅" : "👤"}</span>
-          <span style={{ fontSize: "10px", color: "#666", fontWeight: 600 }}>Mon Compte</span>
-        </button>
+        <button onClick={() => {
+  const staff = localStorage.getItem("ms_web_user");
+  const client = localStorage.getItem("ms_client_user");
+  if (staff) { window.location.href = "/dashboard"; return; }
+  if (client) { window.location.href = "/mon-compte"; return; }
+  window.location.href = "/login";
+}} style={{ flex: 1, padding: "10px 8px", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+  <span style={{ fontSize: "20px" }}>
+    {mounted && !!localStorage.getItem("ms_web_user") ? "✅" : 
+     mounted && !!localStorage.getItem("ms_client_user") ? "🛍️" : "👤"}
+  </span>
+  <span style={{ fontSize: "10px", color: "#666", fontWeight: 600 }}>
+    {mounted && !!localStorage.getItem("ms_client_user") && !localStorage.getItem("ms_web_user") 
+      ? "Mes Commandes" : "Mon Compte"}
+  </span>
+</button>
       </div>
 
       <style>{`

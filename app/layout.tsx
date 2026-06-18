@@ -25,6 +25,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "MillionStore",
   },
+  openGraph: {
+    title: "MillionStore Haiti",
+    description: "Achte òdinatè, telefòn ak akseswa teknoloji ann Ayiti. Livrezon rapid toupatou.",
+    url: "https://millionstore509.vercel.app",
+    siteName: "MillionStore Haiti",
+    images: [{ url: "https://millionstore509.vercel.app/og-laptop.jpg", width: 1200, height: 630 }],
+  },
 };
 
 export default function RootLayout({
