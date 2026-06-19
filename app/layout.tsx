@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     description: "Achte òdinatè, telefòn ak akseswa teknoloji ann Ayiti. Livrezon rapid toupatou.",
     url: "https://millionstorehaiti.vercel.app",
     siteName: "MillionStore Haiti",
-    images: [{ url: "https://millionstorehaiti.vercel.app/og-laptop.jpg", width: 1200, height: 630 }],
+    images: [{ url: "https://i.ibb.co/pvVKNTm8/product-054-H-img1.jpg", width: 1200, height: 630 }],
   },
 };
 
