@@ -498,25 +498,9 @@ export default function LoginPage() {
           {loading ? "⏳ Connexion..." : "SE CONNECTER"}
         </button>
 
-        {/* Bouton Inscription — couleur différente du bouton "SE CONNECTER" */}
-        <button onClick={() => setShowRegister(true)} style={{ width: "100%", padding: "13px", background: "#e63946", color: "#fff", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: "10px" }}>
+       {/* Bouton Inscription — couleur différente du bouton "SE CONNECTER" */}
+       <button onClick={() => setShowRegister(true)} style={{ width: "100%", padding: "13px", background: "#e63946", color: "#fff", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: "10px" }}>
           S'inscrire
-        </button>
-
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "20px 0" }}>
-          <div style={{ flex: 1, height: "1px", background: "#eee" }} />
-          <span style={{ color: "#aaa", fontSize: "13px", fontWeight: 600 }}>ou</span>
-          <div style={{ flex: 1, height: "1px", background: "#eee" }} />
-        </div>
-
-        {/* Client Google */}
-        <p style={{ margin: "0 0 14px", fontSize: "13px", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-          🛒 Espace Client
-        </p>
-        <button onClick={handleGoogle} disabled={googleLoading} style={{ width: "100%", padding: "14px", background: "#fff", color: "#333", border: "2px solid #eee", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: googleLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontFamily: "inherit" }}>
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: "22px", height: "22px" }} />
-          {googleLoading ? "Connexion..." : "Se connecter avec Google"}
         </button>
 
         <a href="/" style={{ display: "block", textAlign: "center", color: "#888", fontSize: "13px", textDecoration: "none", marginTop: "20px" }}>
