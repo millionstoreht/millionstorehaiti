@@ -6,7 +6,7 @@ import { db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import {
   ShoppingCart, Package, Users, BarChart2, Printer, Settings,
-  Badge, Truck, FileText, HardHat, LogOut, Store,
+  Badge, Truck, FileText, HardHat, LogOut, Store, StickyNote, Info,
 } from "lucide-react";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -44,8 +44,10 @@ const MENU_ITEMS: MenuItem[] = [
   { key: "fournisseurs",  label: "Fournisseur",    icon: <Truck size={36} />,        color: "#795548", href: "/dashboard/fournisseurs",  permKey: "fournisseurVoir" },
   { key: "fiche",         label: "Fiche",          icon: <FileText size={36} />,     color: "#E91E63", href: "/dashboard/fiche",         permKey: "ficheVoir"       },
   { key: "workers",       label: "Workers",        icon: <HardHat size={36} />,      color: "#795548", href: "/dashboard/workers",       permKey: "workersVoir"     },
+  { key: "notes",         label: "Note",           icon: <StickyNote size={36} />,   color: "#FFC107", href: "/dashboard/notes",         permKey: "noteVoir"        },
   { key: "site-settings", label: "Setting Site",   icon: <Globe size={36} />,        color: "#e63946", href: "/dashboard/site-settings", adminOnly: true            },
   { key: "commandes",     label: "Commandes",      icon: <ShoppingCart size={36} />, color: "#FF5722", href: "/dashboard/commandes",     adminOnly: true            },
+  { key: "information", label: "Information", icon: <Info size={36} />, color: "#1565C0", href: "/dashboard/information" },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -48,27 +48,27 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
   const [success, setSuccess]         = useState("");
 
   const verifyAnswers = async () => {
-    if (!username || !rep1 || !rep2 || !rep3) { setError("Ranpli tout champ yo."); return; }
+    if (!username || !rep1 || !rep2 || !rep3) { setError("Veuillez remplir tous les champs."); return; }
     setLoading(true); setError("");
     try {
       const snap = await getDoc(doc(db, "users", username.trim()));
-      if (!snap.exists()) { setError("Itilizatè pa jwenn."); setLoading(false); return; }
+      if (!snap.exists()) { setError("Utilisateur introuvable."); setLoading(false); return; }
       const data = snap.data();
       const q = data.securityQuestions;
-      if (!q) { setError("Pa gen kesyon sekirite pou kont sa."); setLoading(false); return; }
+      if (!q) { setError("Aucune question de sécurité pour ce compte."); setLoading(false); return; }
       const ok =
         q.rep1?.toLowerCase().trim() === rep1.toLowerCase().trim() &&
         q.rep2?.toLowerCase().trim() === rep2.toLowerCase().trim() &&
         q.rep3?.toLowerCase().trim() === rep3.toLowerCase().trim();
-      if (!ok) { setError("Yon oswa plizyè repons pa kòrèk."); setLoading(false); return; }
+      if (!ok) { setError("Une ou plusieurs réponses sont incorrectes."); setLoading(false); return; }
       setStep("newpass");
-    } catch { setError("Erè. Eseye ankò."); }
+    } catch { setError("Erreur. Veuillez réessayer."); }
     setLoading(false);
   };
 
   const saveNewPassword = async () => {
-    if (newPass.length < 6) { setError("Modpas dwe gen omwen 6 karaktè."); return; }
-    if (newPass !== confirmPass) { setError("Modpas yo pa menm."); return; }
+    if (newPass.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
+    if (newPass !== confirmPass) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true); setError("");
     try {
       const hashed = await hashPassword(newPass);
@@ -77,9 +77,9 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
         loginAttempts: 0,
         isBlocked: false,
       });
-      setSuccess("✅ Modpas chanje avèk siksè!");
+      setSuccess("✅ Mot de passe changé avec succès !");
       setTimeout(() => onClose(), 2000);
-    } catch { setError("Erè. Eseye ankò."); }
+    } catch { setError("Erreur. Veuillez réessayer."); }
     setLoading(false);
   };
 
@@ -91,10 +91,10 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <div>
               <p style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: "#1a1a2e" }}>
-                {step === "questions" ? "🔐 Modpas bliye" : "🔒 Nouvo modpas"}
+                {step === "questions" ? "🔐 Mot de passe oublié" : "🔒 Nouveau mot de passe"}
               </p>
               <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#888" }}>
-                {step === "questions" ? "Reponn 3 kesyon sekirite yo" : "Chwazi yon nouvo modpas"}
+                {step === "questions" ? "Répondez aux 3 questions de sécurité" : "Choisissez un nouveau mot de passe"}
               </p>
             </div>
             <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f1f1f1", border: "none", fontSize: "16px", cursor: "pointer" }}>×</button>
@@ -105,23 +105,23 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
 
           {step === "questions" && (
             <>
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>NON ITILIZATÈ</p>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username ou..."
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>NOM D'UTILISATEUR</p>
+              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="votre nom d'utilisateur..."
                 style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #e8e8e8", borderRadius: "12px", fontSize: "14px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box", marginBottom: "14px" }} />
 
               {[
-                { label: "1️⃣ Non jèn fi manman ou?", val: rep1, set: setRep1 },
-                { label: "2️⃣ Ki vil ou fèt?", val: rep2, set: setRep2 },
-                { label: "3️⃣ Ki jan rele pi bon zanmi ou?", val: rep3, set: setRep3 },
+                { label: "1️⃣ Nom de jeune fille de votre mère ?", val: rep1, set: setRep1 },
+                { label: "2️⃣ Dans quelle ville êtes-vous né(e) ?", val: rep2, set: setRep2 },
+                { label: "3️⃣ Quel est le nom de votre meilleur(e) ami(e) ?", val: rep3, set: setRep3 },
               ].map(({ label, val, set }) => (
                 <div key={label} style={{ background: "#f8f9fa", borderRadius: "14px", padding: "14px", marginBottom: "10px" }}>
                   <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, color: "#1a1a2e" }}>{label}</p>
-                  <input value={val} onChange={(e) => set(e.target.value)} placeholder="Repons ou..."
+                  <input value={val} onChange={(e) => set(e.target.value)} placeholder="Votre réponse..."
                     style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #e0e0e0", borderRadius: "10px", fontSize: "13px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box" }} />
                 </div>
               ))}
               <button onClick={verifyAnswers} disabled={loading} style={{ width: "100%", padding: "15px", background: loading ? "#888" : "#1a1a2e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: "6px" }}>
-                {loading ? "⏳ Verifikasyon..." : "✅ Verifye repons mwen"}
+                {loading ? "⏳ Vérification..." : "✅ Vérifier mes réponses"}
               </button>
             </>
           )}
@@ -129,11 +129,11 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
           {step === "newpass" && (
             <>
               <div style={{ background: "#e8fdf0", borderRadius: "12px", padding: "12px", marginBottom: "16px", textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: "13px", color: "#1a9e6e", fontWeight: 700 }}>✅ Repons yo kòrèk! Antre nouvo modpas ou.</p>
+                <p style={{ margin: 0, fontSize: "13px", color: "#1a9e6e", fontWeight: 700 }}>✅ Réponses correctes ! Entrez votre nouveau mot de passe.</p>
               </div>
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>NOUVO MODPAS</p>
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>NOUVEAU MOT DE PASSE</p>
               <div style={{ display: "flex", alignItems: "center", border: "1.5px solid #e8e8e8", borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "10px" }}>
-                <input type={showNew ? "text" : "password"} value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Min. 6 karaktè"
+                <input type={showNew ? "text" : "password"} value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Min. 6 caractères"
                   style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
                 <button type="button" onClick={() => setShowNew(!showNew)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>{showNew ? "🙈" : "👁️"}</button>
               </div>
@@ -143,20 +143,20 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
                     <div style={{ height: "100%", borderRadius: "999px", width: newPass.length >= 10 ? "100%" : newPass.length >= 6 ? "60%" : "25%", background: newPass.length >= 10 ? "#1a9e6e" : newPass.length >= 6 ? "#f79f1f" : "#e63946", transition: "width 0.3s" }} />
                   </div>
                   <p style={{ margin: "3px 0 0", fontSize: "10px", color: newPass.length >= 10 ? "#1a9e6e" : newPass.length >= 6 ? "#f79f1f" : "#e63946" }}>
-                    {newPass.length >= 10 ? "Fort 💪" : newPass.length >= 6 ? "Mwayèn" : "Twò kout"}
+                    {newPass.length >= 10 ? "Fort 💪" : newPass.length >= 6 ? "Moyen" : "Trop court"}
                   </p>
                 </div>
               )}
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>KONFIME MODPAS</p>
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>CONFIRMER LE MOT DE PASSE</p>
               <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${confirmPass && confirmPass !== newPass ? "#e63946" : "#e8e8e8"}`, borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px" }}>
-                <input type={showConfirm ? "text" : "password"} value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="Repete modpas la"
+                <input type={showConfirm ? "text" : "password"} value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="Répétez le mot de passe"
                   style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
                 <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>{showConfirm ? "🙈" : "👁️"}</button>
               </div>
-              {confirmPass && confirmPass !== newPass && <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#e63946" }}>❌ Modpas yo pa menm</p>}
-              {confirmPass && confirmPass === newPass && <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#1a9e6e" }}>✅ Modpas yo menm</p>}
+              {confirmPass && confirmPass !== newPass && <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#e63946" }}>❌ Les mots de passe ne correspondent pas</p>}
+              {confirmPass && confirmPass === newPass && <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#1a9e6e" }}>✅ Les mots de passe correspondent</p>}
               <button onClick={saveNewPassword} disabled={loading} style={{ width: "100%", padding: "15px", background: loading ? "#888" : "#1a9e6e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: "8px" }}>
-                {loading ? "⏳ Sauvegade..." : "💾 Chanje modpas la"}
+                {loading ? "⏳ Enregistrement..." : "💾 Changer le mot de passe"}
               </button>
             </>
           )}
@@ -171,10 +171,13 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
 // ══════════════════════════════════════════════════════════════════════════
 function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [step, setStep]         = useState<"info" | "security">("info");
-  const [nom, setNom]           = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
+  const [nom, setNom]                 = useState("");
+const [prenom, setPrenom]           = useState("");
+const [username, setUsername]       = useState("");
+const [password, setPassword]       = useState("");
+const [confirmPassword, setConfirmPassword] = useState("");
+const [showPass, setShowPass]       = useState(false);
+const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [rep1, setRep1]         = useState("");
   const [rep2, setRep2]         = useState("");
   const [rep3, setRep3]         = useState("");
@@ -182,26 +185,27 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
   const [error, setError]       = useState("");
 
   const goToSecurity = async () => {
-    if (!nom.trim() || !username.trim() || !password.trim()) {
-      setError("Non, username ak modpas obligatwa."); return;
+    if (!nom.trim() || !prenom.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
+      setError("Tous les champs sont obligatoires."); return;
     }
-    if (password.length < 6) { setError("Modpas dwe gen omwen 6 karaktè."); return; }
-    // Verifye si username deja egziste
+    if (password.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
+    if (password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return; }
+    // Vérifie si le username existe déjà
     const snap = await getDoc(doc(db, "users", username.trim()));
-    if (snap.exists()) { setError("Username sa deja pran. Chwazi yon lòt."); return; }
+    if (snap.exists()) { setError("Ce nom d'utilisateur est déjà pris. Choisissez-en un autre."); return; }
     setError(""); setStep("security");
   };
 
   const submit = async () => {
     if (!rep1.trim() || !rep2.trim() || !rep3.trim()) {
-      setError("Reponn tout 3 kesyon sekirite yo."); return;
+      setError("Répondez aux 3 questions de sécurité."); return;
     }
     setLoading(true);
     try {
       const hashed = await hashPassword(password.trim());
       const newUser = {
         username:    username.trim(),
-        displayName: nom.trim(),
+        displayName: `${prenom.trim()} ${nom.trim()}`,
         password:    hashed,
         isAdmin:     false,
         isBlocked:   false,
@@ -212,7 +216,7 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           rep2: rep2.trim().toLowerCase(),
           rep3: rep3.trim().toLowerCase(),
         },
-        // Permissions defo — tout false
+        // Permissions par défaut — toutes à false
         factureVoir: false, factureCreye: false, factureModifye: false, factureSiprime: false, factureAnile: false, factureVoirIstwa: false,
         produitVoir: false, produitAjoute: false, produitModifye: false, produitSiprime: false, produitChangePrix: false,
         clientVoir: false, clientAjoute: false, clientModifye: false, clientSiprime: false,
@@ -233,12 +237,12 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
         createdAt: new Date().toISOString(),
       };
 
-      // Sove nan users/{username}
+      // Sauvegarde dans users/{username}
       await setDoc(doc(db, "users", username.trim()), newUser);
       onSuccess();
       onClose();
     } catch (e: any) {
-      setError("Erè. Eseye ankò.");
+      setError("Erreur. Veuillez réessayer.");
     }
     setLoading(false);
   };
@@ -259,10 +263,10 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <div>
               <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: "#1a1a2e" }}>
-                {step === "info" ? "🆕 Kreye yon kont" : "🔐 Kesyon Sekirite"}
+                {step === "info" ? "🆕 Créer un compte" : "🔐 Questions de sécurité"}
               </h3>
               <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#888" }}>
-                {step === "info" ? "Etap 1/2 — Enfòmasyon ou" : "Etap 2/2 — Pou sekirite ou"}
+                {step === "info" ? "Étape 1/2 — Vos informations" : "Étape 2/2 — Pour votre sécurité"}
               </p>
             </div>
             <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f1f1f1", border: "none", fontSize: "16px", cursor: "pointer" }}>×</button>
@@ -273,8 +277,9 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           {step === "info" && (
             <>
               {[
-                { label: "NON KONPLÈ *", val: nom, set: setNom, ph: "Jean Pierre", type: "text" },
-                { label: "USERNAME *", val: username, set: setUsername, ph: "jeanpierre", type: "text" },
+                { label: "NOM *", val: nom, set: setNom, ph: "Nom", type: "text" },
+                { label: "PRÉNOM *", val: prenom, set: setPrenom, ph: "Prénom", type: "text" },
+                { label: "NOM D'UTILISATEUR *", val: username, set: setUsername, ph: "Username", type: "text" },
               ].map(({ label, val, set, ph, type }) => (
                 <div key={label} style={{ marginBottom: "12px" }}>
                   <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>{label}</p>
@@ -283,7 +288,7 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
                 </div>
               ))}
 
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>MODPAS * (min. 6)</p>
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>MOT DE PASSE * (min. 6)</p>
               <div style={{ display: "flex", alignItems: "center", border: "1.5px solid #e8e8e8", borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px", background: "#f8f8f8" }}>
                 <input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
                   style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
@@ -292,18 +297,29 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
                 </button>
               </div>
               {password && (
-                <div style={{ marginBottom: "18px" }}>
+                <div style={{ marginBottom: "12px" }}>
                   <div style={{ height: "4px", borderRadius: "999px", background: "#f0f0f0", overflow: "hidden" }}>
                     <div style={{ height: "100%", borderRadius: "999px", width: password.length >= 10 ? "100%" : password.length >= 6 ? "60%" : "25%", background: password.length >= 10 ? "#1a9e6e" : password.length >= 6 ? "#f79f1f" : "#e63946", transition: "width 0.3s" }} />
                   </div>
                   <p style={{ margin: "3px 0 0", fontSize: "10px", color: password.length >= 10 ? "#1a9e6e" : password.length >= 6 ? "#f79f1f" : "#e63946" }}>
-                    {password.length >= 10 ? "Fort 💪" : password.length >= 6 ? "Mwayèn" : "Twò kout"}
+                    {password.length >= 10 ? "Fort 💪" : password.length >= 6 ? "Moyen" : "Trop court"}
                   </p>
                 </div>
               )}
 
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>CONFIRMER LE MOT DE PASSE *</p>
+              <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${confirmPassword && confirmPassword !== password ? "#e63946" : "#e8e8e8"}`, borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px", background: "#f8f8f8" }}>
+                <input type={showConfirmPass ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••"
+                  style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
+                <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>
+                  {showConfirmPass ? "🙈" : "👁️"}
+                </button>
+              </div>
+              {confirmPassword && confirmPassword !== password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#e63946" }}>❌ Les mots de passe ne correspondent pas</p>}
+              {confirmPassword && confirmPassword === password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#1a9e6e" }}>✅ Les mots de passe correspondent</p>}
+
               <button onClick={goToSecurity} style={{ width: "100%", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                Swivan → Kesyon Sekirite
+                Suivant → Questions de sécurité
               </button>
             </>
           )}
@@ -312,28 +328,28 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             <>
               <div style={{ background: "#f0f4ff", borderRadius: "12px", padding: "10px 12px", marginBottom: "14px" }}>
                 <p style={{ margin: 0, fontSize: "12px", color: "#3b4dd4" }}>
-                  ℹ️ Repons sa yo ap sèvi pou rekipere modpas ou si ou bliye l. Sonje yo byen!
+                  ℹ️ Ces réponses serviront à récupérer votre mot de passe si vous l'oubliez. Mémorisez-les bien !
                 </p>
               </div>
 
               {[
-                { label: "1️⃣ Non jèn fi manman ou?", val: rep1, set: setRep1 },
-                { label: "2️⃣ Ki vil ou fèt?", val: rep2, set: setRep2 },
-                { label: "3️⃣ Ki jan rele pi bon zanmi ou?", val: rep3, set: setRep3 },
+                { label: "1️⃣ Nom de jeune fille de votre mère ?", val: rep1, set: setRep1 },
+                { label: "2️⃣ Dans quelle ville êtes-vous né(e) ?", val: rep2, set: setRep2 },
+                { label: "3️⃣ Quel est le nom de votre meilleur(e) ami(e) ?", val: rep3, set: setRep3 },
               ].map(({ label, val, set }) => (
                 <div key={label} style={{ background: "#f8f9fa", borderRadius: "14px", padding: "12px 14px", marginBottom: "10px" }}>
                   <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, color: "#1a1a2e" }}>{label}</p>
-                  <input value={val} onChange={(e) => set(e.target.value)} placeholder="Repons ou..."
+                  <input value={val} onChange={(e) => set(e.target.value)} placeholder="Votre réponse..."
                     style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #e0e0e0", borderRadius: "10px", fontSize: "13px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box" }} />
                 </div>
               ))}
 
               <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
                 <button onClick={() => { setStep("info"); setError(""); }} style={{ flex: 1, padding: "14px", background: "#f0f0f0", color: "#333", border: "none", borderRadius: "14px", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  ← Retounen
+                  ← Retour
                 </button>
                 <button onClick={submit} disabled={loading} style={{ flex: 2, padding: "14px", background: loading ? "#888" : "#1a9e6e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                  {loading ? "⏳ Kreyasyon..." : "✅ Kreye kont mwen"}
+                  {loading ? "⏳ Création..." : "✅ Créer mon compte"}
                 </button>
               </div>
             </>
@@ -360,18 +376,18 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg]     = useState("");
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) { setError("Tape username ak modpas ou."); return; }
+    if (!username.trim() || !password.trim()) { setError("Veuillez saisir votre nom d'utilisateur et votre mot de passe."); return; }
     setLoading(true); setError("");
     try {
       const userDoc = await getDoc(doc(db, "users", username.trim()));
-      if (!userDoc.exists()) { setError("Itilizatè pa jwenn."); setLoading(false); return; }
+      if (!userDoc.exists()) { setError("Utilisateur introuvable."); setLoading(false); return; }
       const userData = userDoc.data();
-      if (userData.isBlocked === true) { setError("Kont ou bloke. Kontakte MillionStore."); setLoading(false); return; }
+      if (userData.isBlocked === true) { setError("Votre compte est bloqué. Contactez MillionStore."); setLoading(false); return; }
       if (!await verifyPassword(password.trim(), userData.password ?? "", userData.salt)) {
         const attempts = (userData.loginAttempts ?? 0) + 1;
         const shouldBlock = attempts >= 5;
         await setDoc(doc(db, "users", username.trim()), { loginAttempts: attempts, isBlocked: shouldBlock }, { merge: true });
-        setError(shouldBlock ? "Kont ou bloke apre 5 eseye. Kontakte MillionStore." : `Modpas mal. ${5 - attempts} eseye rete.`);
+        setError(shouldBlock ? "Votre compte est bloqué après 5 tentatives. Contactez MillionStore." : `Mot de passe incorrect. ${5 - attempts} tentative(s) restante(s).`);
         setLoading(false); return;
       }
       await setDoc(doc(db, "users", username.trim()), { loginAttempts: 0, isBlocked: false }, { merge: true });
@@ -385,7 +401,7 @@ export default function LoginPage() {
       };
       localStorage.setItem("ms_web_user", JSON.stringify(sessionUser));
       router.push("/dashboard");
-    } catch (e) { setError("Erè: " + e); setLoading(false); }
+    } catch (e) { setError("Erreur : " + e); setLoading(false); }
   };
 
   const handleGoogle = async () => {
@@ -408,7 +424,7 @@ export default function LoginPage() {
       const redirect = localStorage.getItem("ms_redirect_after_login");
       if (redirect) { localStorage.removeItem("ms_redirect_after_login"); window.location.href = redirect; }
       else router.push("/mon-compte");
-    } catch (e: any) { setError("Erè Google: " + (e.message ?? e)); setGoogleLoading(false); }
+    } catch (e: any) { setError("Erreur Google : " + (e.message ?? e)); setGoogleLoading(false); }
   };
 
   return (
@@ -419,7 +435,7 @@ export default function LoginPage() {
         <RegisterModal
           onClose={() => setShowRegister(false)}
           onSuccess={() => {
-            setSuccessMsg("✅ Kont ou kreye! Konekte kounye a.");
+            setSuccessMsg("✅ Votre compte a été créé ! Connectez-vous maintenant.");
             setTimeout(() => setSuccessMsg(""), 5000);
           }}
         />
@@ -429,11 +445,11 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <img src="https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg" alt="MillionStore" style={{ height: "70px", objectFit: "contain", marginBottom: "10px" }} />
+          <img src="https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg" alt="MillionStore" style={{ height: "70px", objectFit: "contain", marginBottom: "10px", display: "block", marginLeft: "auto", marginRight: "auto" }} />
           <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: "#1a1a2e" }}>
             Million<span style={{ color: "#e63946" }}>Store</span>
           </h1>
-          <p style={{ margin: "4px 0 0", color: "#888", fontSize: "13px" }}>Konekte oswa kreye yon kont</p>
+          <p style={{ margin: "4px 0 0", color: "#888", fontSize: "13px" }}>Connectez-vous ou créez un compte</p>
         </div>
 
         {/* Success msg */}
@@ -450,7 +466,7 @@ export default function LoginPage() {
 
         <div style={{ position: "relative", marginBottom: "12px" }}>
           <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>👤</span>
-          <input type="text" placeholder="Nom utilisateur" value={username} onChange={(e) => setUsername(e.target.value)}
+          <input type="text" placeholder="Nom d'utilisateur" value={username} onChange={(e) => setUsername(e.target.value)}
             style={{ width: "100%", padding: "13px 14px 13px 44px", borderRadius: "12px", border: "1.5px solid #eee", fontSize: "15px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
             onFocus={(e) => e.target.style.borderColor = "#1a1a2e"} onBlur={(e) => e.target.style.borderColor = "#eee"} />
         </div>
@@ -468,7 +484,7 @@ export default function LoginPage() {
 
         <div style={{ textAlign: "right", marginBottom: "14px" }}>
           <button onClick={() => setShowReset(true)} style={{ background: "none", border: "none", color: "#e63946", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Modpas bliye?
+            Mot de passe oublié ?
           </button>
         </div>
 
@@ -479,18 +495,18 @@ export default function LoginPage() {
         )}
 
         <button onClick={handleLogin} disabled={loading} style={{ width: "100%", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "12px", fontSize: "16px", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, fontFamily: "inherit" }}>
-          {loading ? "⏳ Koneksyon..." : "SE CONNECTER"}
+          {loading ? "⏳ Connexion..." : "SE CONNECTER"}
         </button>
 
-        {/* Bouton Enskri */}
-        <button onClick={() => setShowRegister(true)} style={{ width: "100%", padding: "13px", background: "#fff", color: "#1a1a2e", border: "1.5px solid #1a1a2e", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: "10px" }}>
-          🆕 Pa gen kont? Enskri kounye a
+        {/* Bouton Inscription — couleur différente du bouton "SE CONNECTER" */}
+        <button onClick={() => setShowRegister(true)} style={{ width: "100%", padding: "13px", background: "#e63946", color: "#fff", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: "10px" }}>
+          S'inscrire
         </button>
 
         {/* Divider */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "20px 0" }}>
           <div style={{ flex: 1, height: "1px", background: "#eee" }} />
-          <span style={{ color: "#aaa", fontSize: "13px", fontWeight: 600 }}>oswa</span>
+          <span style={{ color: "#aaa", fontSize: "13px", fontWeight: 600 }}>ou</span>
           <div style={{ flex: 1, height: "1px", background: "#eee" }} />
         </div>
 
@@ -500,11 +516,11 @@ export default function LoginPage() {
         </p>
         <button onClick={handleGoogle} disabled={googleLoading} style={{ width: "100%", padding: "14px", background: "#fff", color: "#333", border: "2px solid #eee", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: googleLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontFamily: "inherit" }}>
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: "22px", height: "22px" }} />
-          {googleLoading ? "Koneksyon..." : "Se connecter avec Google"}
+          {googleLoading ? "Connexion..." : "Se connecter avec Google"}
         </button>
 
         <a href="/" style={{ display: "block", textAlign: "center", color: "#888", fontSize: "13px", textDecoration: "none", marginTop: "20px" }}>
-          ← Retounen nan boutik la
+          ← Retour à la boutique
         </a>
       </div>
     </main>
