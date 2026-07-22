@@ -6,7 +6,7 @@ import { db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import {
   ShoppingCart, Package, Users, BarChart2, Printer, Settings,
-  Badge, Truck, FileText, HardHat, LogOut, Store, StickyNote, Info,
+  Badge, Truck, FileText, HardHat, LogOut, StickyNote, Info,
 } from "lucide-react";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -34,20 +34,20 @@ interface MenuItem {
 // MENU ITEMS
 // ══════════════════════════════════════════════════════════════════════════
 const MENU_ITEMS: MenuItem[] = [
-  { key: "factures",      label: "Fakturation",   icon: <ShoppingCart size={36} />, color: "#2196F3", href: "/dashboard/factures",      permKey: "factureVoir"     },
-  { key: "produits",      label: "Pwodwi",         icon: <Package size={36} />,      color: "#FF9800", href: "/dashboard/produits",      permKey: "produitVoir"     },
-  { key: "clients",       label: "Kliyan",         icon: <Users size={36} />,        color: "#4CAF50", href: "/dashboard/clients",       permKey: "clientVoir"      },
-  { key: "rapports",      label: "Rapò",           icon: <BarChart2 size={36} />,    color: "#F44336", href: "/dashboard/rapports",      permKey: "rapportVoir"     },
-  { key: "imprimante",    label: "Imprimante",     icon: <Printer size={36} />,      color: "#9C27B0", href: "/dashboard/imprimante",    permKey: "imprimanteVoir"  },
-  { key: "parametres",    label: "Paramètre",      icon: <Settings size={36} />,     color: "#9E9E9E", href: "/dashboard/parametres",    permKey: "parametreVoir"   },
-  { key: "vendeurs",      label: "Vendeurs",       icon: <Badge size={36} />,        color: "#3F51B5", href: "/dashboard/vendeurs",      permKey: "vendeurVoir"     },
-  { key: "fournisseurs",  label: "Fournisseur",    icon: <Truck size={36} />,        color: "#795548", href: "/dashboard/fournisseurs",  permKey: "fournisseurVoir" },
-  { key: "fiche",         label: "Fiche",          icon: <FileText size={36} />,     color: "#E91E63", href: "/dashboard/fiche",         permKey: "ficheVoir"       },
-  { key: "workers",       label: "Workers",        icon: <HardHat size={36} />,      color: "#795548", href: "/dashboard/workers",       permKey: "workersVoir"     },
-  { key: "notes",         label: "Note",           icon: <StickyNote size={36} />,   color: "#FFC107", href: "/dashboard/notes",         permKey: "noteVoir"        },
-  { key: "site-settings", label: "Setting Site",   icon: <Globe size={36} />,        color: "#e63946", href: "/dashboard/site-settings", adminOnly: true            },
-  { key: "commandes",     label: "Commandes",      icon: <ShoppingCart size={36} />, color: "#FF5722", href: "/dashboard/commandes",     adminOnly: true            },
-  { key: "information", label: "Information", icon: <Info size={36} />, color: "#1565C0", href: "/dashboard/information" },
+  { key: "factures",      label: "Facturation",   icon: <ShoppingCart size={52} />, color: "#2196F3", href: "/dashboard/factures",      permKey: "factureVoir"     },
+  { key: "produits",      label: "Produits",       icon: <Package size={52} />,      color: "#FF9800", href: "/dashboard/produits",      permKey: "produitVoir"     },
+  { key: "clients",       label: "Clients",        icon: <Users size={52} />,        color: "#4CAF50", href: "/dashboard/clients",       permKey: "clientVoir"      },
+  { key: "rapports",      label: "Rapports",       icon: <BarChart2 size={52} />,    color: "#F44336", href: "/dashboard/rapports",      permKey: "rapportVoir"     },
+  { key: "imprimante",    label: "Imprimante",     icon: <Printer size={52} />,      color: "#9C27B0", href: "/dashboard/imprimante",    permKey: "imprimanteVoir"  },
+  { key: "parametres",    label: "Paramètres",     icon: <Settings size={52} />,     color: "#9E9E9E", href: "/dashboard/parametres",    permKey: "parametreVoir"   },
+  { key: "vendeurs",      label: "Vendeurs",       icon: <Badge size={52} />,        color: "#3F51B5", href: "/dashboard/vendeurs",      permKey: "vendeurVoir"     },
+  { key: "fournisseurs",  label: "Fournisseurs",   icon: <Truck size={52} />,        color: "#795548", href: "/dashboard/fournisseurs",  permKey: "fournisseurVoir" },
+  { key: "fiche",         label: "Fiche",          icon: <FileText size={52} />,     color: "#E91E63", href: "/dashboard/fiche",         permKey: "ficheVoir"       },
+  { key: "workers",       label: "Employés",       icon: <HardHat size={52} />,      color: "#795548", href: "/dashboard/workers",       permKey: "workersVoir"     },
+  { key: "notes",         label: "Notes",          icon: <StickyNote size={52} />,   color: "#FFC107", href: "/dashboard/notes",         permKey: "noteVoir"        },
+  { key: "site-settings", label: "Paramètres du site", icon: <Globe size={52} />,    color: "#e63946", href: "/dashboard/site-settings", adminOnly: true            },
+  { key: "commandes",     label: "Commandes",      icon: <ShoppingCart size={52} />, color: "#FF5722", href: "/dashboard/commandes",     adminOnly: true            },
+  { key: "information",   label: "Informations",   icon: <Info size={52} />,         color: "#1565C0", href: "/dashboard/information" },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -100,23 +100,23 @@ export default function DashboardPage() {
 
   const visibleItems = MENU_ITEMS.filter(canSee);
 
-  // Salitasyon selon lè
+  // Salutation selon l'heure
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Bonjou" : hour < 18 ? "Bonswa" : "Bonswa";
+  const greeting = hour < 12 ? "Bonjour" : hour < 18 ? "Bonsoir" : "Bonsoir";
 
   // ── Loading ──────────────────────────────────────────────────────────
   if (loading) return (
-    <main style={{ minHeight: "100vh", background: "#F5F0EB", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', sans-serif" }}>
+    <main style={{ minHeight: "100vh", background: "#FDF5EE", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', sans-serif" }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ width: "48px", height: "48px", border: "4px solid #eee", borderTop: "4px solid #1a1a2e", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-        <p style={{ color: "#888", fontSize: "14px" }}>Chajman...</p>
+        <p style={{ color: "#888", fontSize: "14px" }}>Chargement...</p>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </main>
   );
 
   return (
-    <main style={{ minHeight: "100vh", background: "#F5F0EB", fontFamily: "'Segoe UI', sans-serif" }}>
+    <main style={{ minHeight: "100vh", background: "#FDF5EE", fontFamily: "'Segoe UI', sans-serif" }}>
 
       {/* ── Header ── */}
       <div style={{ background: "#1a1a2e", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 10px rgba(0,0,0,0.3)" }}>
@@ -126,7 +126,7 @@ export default function DashboardPage() {
             <p style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: "16px" }}>
               Million<span style={{ color: "#e63946" }}>Store</span>
             </p>
-            <p style={{ margin: 0, color: "#aaa", fontSize: "11px" }}>Dashboard</p>
+            <p style={{ margin: 0, color: "#aaa", fontSize: "11px" }}>Tableau de bord</p>
           </div>
         </div>
 
@@ -137,70 +137,74 @@ export default function DashboardPage() {
               background: user?.isAdmin ? "#e63946" : "#4CAF50",
               color: "#fff", padding: "1px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 700,
             }}>
-              {user?.isAdmin ? "👑 ADMIN" : "👤 ITILIZATÈ"}
+              {user?.isAdmin ? "👑 ADMIN" : "👤 UTILISATEUR"}
             </span>
           </div>
 
-          <a href="/" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "8px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600, textDecoration: "none", display: "flex", alignItems: "center", gap: "6px" }}>
-            <Store size={15} /> Sit la
-          </a>
-
           <button onClick={handleLogout} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "8px 14px", borderRadius: "10px", cursor: "pointer", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px", fontFamily: "inherit" }}>
-            <LogOut size={15} /> Dekonekte
+            <LogOut size={15} /> Déconnexion
           </button>
         </div>
       </div>
 
-      {/* ── Kò ── */}
+      {/* ── Corps ── */}
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "32px 20px" }}>
 
-        {/* Bonjou */}
+        {/* Salutation */}
         <div style={{ marginBottom: "28px" }}>
           <h1 style={{ margin: "0 0 4px", fontSize: "26px", color: "#1a1a2e", fontWeight: 900 }}>
             👋 {greeting}, {user?.displayName?.split(" ")[0]}!
           </h1>
           <p style={{ margin: "0 0 10px", color: "#888", fontSize: "14px" }}>
             {user?.isAdmin
-              ? "Ou gen aksè konplè ak tout sistèm nan."
-              : `Ou gen aksè a ${visibleItems.length} seksyon.`}
+              ? "Vous avez un accès complet à tout le système."
+              : `Vous avez accès à ${visibleItems.length} section(s).`}
           </p>
 
-          {/* Estatistik rapid */}
+          {/* Statistique rapide */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: user?.isAdmin ? "#fce8e8" : "#e8f4fd", borderRadius: "999px", padding: "6px 14px" }}>
             <span style={{ fontSize: "13px" }}>{user?.isAdmin ? "👑" : "👤"}</span>
             <span style={{ fontSize: "12px", fontWeight: 700, color: user?.isAdmin ? "#e63946" : "#1a6fa8" }}>
-              {user?.isAdmin ? "Administrateur" : "Itilizatè"} • {visibleItems.length} seksyon disponib
+              {user?.isAdmin ? "Administrateur" : "Utilisateur"} • {visibleItems.length} section(s) disponible(s)
             </span>
           </div>
         </div>
 
-        {/* ── Grid menu ── */}
+        {/* ── Grille du menu (style Flutter : carte blanche, icône colorée directe) ── */}
         {visibleItems.length === 0 ? (
           <div style={{ background: "#fff", borderRadius: "20px", padding: "60px", textAlign: "center", border: "1px solid #eee" }}>
             <p style={{ fontSize: "48px", margin: "0 0 12px" }}>🔒</p>
-            <p style={{ color: "#666", fontSize: "16px", fontWeight: 700, margin: "0 0 6px" }}>Okenn aksè disponib</p>
-            <p style={{ color: "#aaa", fontSize: "13px", margin: 0 }}>Kontakte yon admin pou permissions ou.</p>
+            <p style={{ color: "#666", fontSize: "16px", fontWeight: 700, margin: "0 0 6px" }}>Aucun accès disponible</p>
+            <p style={{ color: "#aaa", fontSize: "13px", margin: 0 }}>Contactez un administrateur pour vos permissions.</p>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "16px" }}>
             {visibleItems.map((item) => (
               <a key={item.key} href={item.href} style={{ textDecoration: "none" }}>
                 <div
-                  style={{ background: "#fff", borderRadius: "20px", padding: "28px 16px", border: "1px solid #eee", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", textAlign: "center", transition: "all 0.2s" }}
+                  style={{
+                    background: "#fff",
+                    borderRadius: "20px",
+                    padding: "28px 16px",
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "12px",
+                    textAlign: "center",
+                    aspectRatio: "1.1",
+                    transition: "transform 0.15s",
+                  }}
                   onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLDivElement;
-                    el.style.transform = "translateY(-4px)";
-                    el.style.boxShadow = `0 12px 28px ${item.color}30`;
-                    el.style.borderColor = `${item.color}50`;
+                    (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)";
                   }}
                   onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLDivElement;
-                    el.style.transform = "";
-                    el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
-                    el.style.borderColor = "#eee";
+                    (e.currentTarget as HTMLDivElement).style.transform = "";
                   }}
                 >
-                  <div style={{ width: "70px", height: "70px", borderRadius: "18px", background: `${item.color}18`, display: "flex", alignItems: "center", justifyContent: "center", color: item.color }}>
+                  <div style={{ color: item.color, display: "flex" }}>
                     {item.icon}
                   </div>
                   <p style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1a1a2e" }}>
@@ -213,12 +217,12 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── Bottom bar ── */}
+      {/* ── Barre du bas ── */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #eee", display: "flex", justifyContent: "space-around", alignItems: "center", padding: "8px 0 12px", boxShadow: "0 -2px 10px rgba(0,0,0,0.06)", zIndex: 100 }}>
         {[
-          { icon: "🏠", label: "Boutik",    href: "/"                     },
-          { icon: "⚡", label: "Dashboard", href: "/dashboard"             },
-          { icon: "⚙️", label: "Paramèt",  href: "/dashboard/parametres" },
+          { icon: "🏠", label: "Boutique",       href: "/"                     },
+          { icon: "⚡", label: "Tableau de bord", href: "/dashboard"             },
+          { icon: "⚙️", label: "Paramètres",     href: "/dashboard/parametres" },
         ].map(({ icon, label, href }) => (
           <a key={label} href={href} style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
             <span style={{ fontSize: "22px" }}>{icon}</span>
