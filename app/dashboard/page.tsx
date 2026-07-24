@@ -95,7 +95,7 @@ export default function DashboardPage() {
     if (user.isAdmin) return true;
     if (item.adminOnly) return false;
     if (item.permKey) return user.permissions[item.permKey] === true;
-    return false;
+    return true;
   };
 
   const visibleItems = MENU_ITEMS.filter(canSee);
