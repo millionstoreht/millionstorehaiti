@@ -600,7 +600,12 @@ export default function FacturePage() {
     const idx = vends.findIndex(v => v.nom === facture.vendeur);
     if (idx === -1) return;
     const ventes = [...(vends[idx].ventes ?? [])];
-    const alreadyAdded = ventes.some(v => v.factureId ? v.factureId === facture.id : v.billNo === facture.billNo);
+    const alreadyAdded = ventes.some(v =>
+      v.factureId != null &&
+      v.factureId === facture.id &&
+      v.billNo === facture.billNo &&
+      v.date === facture.date
+    );
     if (alreadyAdded) return;
     const hist = [...(vends[idx].historique ?? [])];
     let totalGain = 0;
@@ -627,7 +632,11 @@ export default function FacturePage() {
     let gainRetire = 0;
     const hist = [...(vends[idx].historique ?? [])];
     vends[idx].ventes = (vends[idx].ventes ?? []).filter(v => {
-      const match = v.factureId ? v.factureId === facture.id : v.billNo === facture.billNo;
+      const match =
+  v.factureId != null &&
+  v.factureId === facture.id &&
+  v.billNo === facture.billNo &&
+  v.date === facture.date;
       if (match) {
         gainRetire += v.gainTotal ?? 0;
         hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: facture.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
@@ -795,7 +804,11 @@ export default function FacturePage() {
           let gainRetire = 0;
           const hist = [...(vends[idx].historique ?? [])];
           vends[idx].ventes = (vends[idx].ventes ?? []).filter((v: VenteItem) => {
-            const match = v.factureId ? v.factureId === f.id : v.billNo === f.billNo;
+            const match =
+  v.factureId != null &&
+  v.factureId === f.id &&
+  v.billNo === f.billNo &&
+  v.date === f.date;
             if (match) {
               gainRetire += v.gainTotal ?? 0;
               hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: f.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));

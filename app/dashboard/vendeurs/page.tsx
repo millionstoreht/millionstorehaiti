@@ -132,6 +132,7 @@ function phraseMouvement(type: string, montant: number, avant: number, apres: nu
     case "suppression_definitive": return `Vente enlevée de $${m}. Vous aviez $${a}, vous avez maintenant $${b}.`;
     case "annulation": return `Vente annulée de $${m}. Vous aviez $${a}, il vous reste $${b}.`;
     case "retrait": return `Retrait de $${m}. Vous aviez $${a}, il vous reste $${b}.`;
+    case "depot": return `Dépôt effectué de $${m}. Vous aviez $${a}, vous avez maintenant $${b}.`;
     default: return `Solde actuel : $${b}.`;
   }
 }
@@ -152,6 +153,7 @@ export default function VendeursPage() {
   const [showAddModal, setShowAddModal]       = useState(false);
   const [showCommModal, setShowCommModal]     = useState(false);
   const [showRetraitModal, setShowRetraitModal] = useState<Vendeur|null>(null);
+  const [showDepotModal, setShowDepotModal] = useState<Vendeur|null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<Vendeur|null>(null);
   const [showDeleteBlocked, setShowDeleteBlocked] = useState<Vendeur|null>(null);
   const [showSiprimeConfirm, setShowSiprimeConfirm] = useState<{v:Vendeur,t:Vente}|null>(null);
@@ -270,6 +272,32 @@ export default function VendeursPage() {
       });
       snack(`✅ Retrait de $${montant.toFixed(2)} effectué.`, "#00C853");
       setShowRetraitModal(null);
+    } catch (e) {
+      snack("❌ " + (e instanceof Error ? e.message : "Erè"), "red");
+    } finally { setBusy(false); }
+  };
+
+  /** Dépôt — l'admin ajoute un montant manuellement au solde du vendeur.
+   *  Même transaction atomique que Retrait, pour empêcher toute course
+   *  si 2 appareils modifient le même vendeur en même temps. */
+  const depotVendeur = async (v: Vendeur, montant: number) => {
+    if (busy) return;
+    setBusy(true);
+    const lid = v.localId ?? localId;
+    const ref = doc(db, "locals", lid, "vendeurs", v.id);
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error("Vendeur introuvable");
+        const current = snap.data() as Vendeur;
+        const currentBalance = Number(current.balance ?? 0);
+        const historique = [...(current.historique ?? []), histEntry({
+          type: "depot", montant: montant, description: "Dépôt effectué par l'admin",
+        })];
+        tx.update(ref, { balance: currentBalance + montant, historique });
+      });
+      snack(`✅ Dépôt de $${montant.toFixed(2)} effectué.`, "#00C853");
+      setShowDepotModal(null);
     } catch (e) {
       snack("❌ " + (e instanceof Error ? e.message : "Erè"), "red");
     } finally { setBusy(false); }
@@ -490,13 +518,23 @@ export default function VendeursPage() {
                       <p style={{ margin:0, color, fontWeight:700, fontSize:15 }}>
                         ${v.balance.toFixed(2)}
                       </p>
-                      {user.isAdmin && v.balance > 0 && (
-                        <button onClick={e => { e.stopPropagation(); setShowRetraitModal(v); }}
-                          style={{ background:"rgba(0,200,83,0.2)", border:"none",
-                            color:"#00C853", padding:"2px 8px", borderRadius:8,
-                            cursor:"pointer", fontSize:10, fontWeight:700, marginTop:4 }}>
-                          Retrait
-                        </button>
+                      {user.isAdmin && (
+                        <div style={{ display:"flex", gap:4, marginTop:4, justifyContent:"flex-end" }}>
+                          <button onClick={e => { e.stopPropagation(); setShowDepotModal(v); }}
+                            style={{ background:"rgba(41,121,255,0.2)", border:"none",
+                              color:"#2979FF", padding:"2px 8px", borderRadius:8,
+                              cursor:"pointer", fontSize:10, fontWeight:700 }}>
+                            Dépôt
+                          </button>
+                          {v.balance > 0 && (
+                            <button onClick={e => { e.stopPropagation(); setShowRetraitModal(v); }}
+                              style={{ background:"rgba(0,200,83,0.2)", border:"none",
+                                color:"#00C853", padding:"2px 8px", borderRadius:8,
+                                cursor:"pointer", fontSize:10, fontWeight:700 }}>
+                              Retrait
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -749,11 +787,11 @@ export default function VendeursPage() {
                 const soldeAvant = (l.soldeApres ?? 0) - l.montant;
                 const phrase = phraseMouvement(l.type, l.montant, soldeAvant, l.soldeApres ?? 0);
                 const iconMap: Record<string, string> = {
-                  vente: "🛒", restauration: "♻️", annulation: "🚫", suppression_definitive: "🗑", retrait: "💸",
+                  vente: "🛒", restauration: "♻️", annulation: "🚫", suppression_definitive: "🗑", retrait: "💸", depot: "💰",
                 };
                 const titreMap: Record<string, string> = {
                   vente: "Vente ajoutée", restauration: "Vente restaurée", annulation: "Vente annulée",
-                  suppression_definitive: "Vente enlevée", retrait: "Retrait effectué",
+                  suppression_definitive: "Vente enlevée", retrait: "Retrait effectué", depot: "Dépôt effectué",
                 };
                 return (
                   <div key={i} style={{ background:"rgba(255,255,255,0.03)",
@@ -814,6 +852,13 @@ export default function VendeursPage() {
         <RetraitModal v={showRetraitModal} busy={busy}
           onClose={() => setShowRetraitModal(null)}
           onConfirm={(m) => retraitVendeur(showRetraitModal, m)} />
+      )}
+
+      {/* ═══════════════ MODAL: DÉPÔT ═══════════════ */}
+      {showDepotModal && (
+        <DepotModal v={showDepotModal} busy={busy}
+          onClose={() => setShowDepotModal(null)}
+          onConfirm={(m) => depotVendeur(showDepotModal, m)} />
       )}
 
       {/* ═══════════════ MODAL: CONFIRMASYON SIPRIME ═══════════════ */}
@@ -966,6 +1011,35 @@ function RetraitModal({ v, busy, onClose, onConfirm }: {
       <div style={{ display:"flex", gap:8, marginTop:16 }}>
         <button onClick={onClose} style={btnSecondary}>Annuler</button>
         <button onClick={submit} disabled={busy} style={btnPrimary("#00C853")}>
+          {busy ? "..." : "Confirmer"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function DepotModal({ v, busy, onClose, onConfirm }: {
+  v: Vendeur; busy: boolean; onClose: () => void; onConfirm: (montant: number) => void;
+}) {
+  const [val, setVal] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const submit = () => {
+    const m = parseFloat(val);
+    if (isNaN(m) || m <= 0) { setErr("Montant invalide"); return; }
+    onConfirm(m);
+  };
+  return (
+    <Modal title="Dépôt" onClose={onClose}>
+      <p style={{ color:"#888", margin:"0 0 12px", fontSize:13 }}>
+        Solde actuel de {v.nom} : ${v.balance.toFixed(2)}
+      </p>
+      <input type="number" value={val} autoFocus
+        onChange={e => { setVal(e.target.value); setErr(null); }}
+        placeholder="Montant du dépôt" style={inputStyle} />
+      {err && <p style={{ color:"#ff4444", fontSize:12, margin:"6px 0 0" }}>{err}</p>}
+      <div style={{ display:"flex", gap:8, marginTop:16 }}>
+        <button onClick={onClose} style={btnSecondary}>Annuler</button>
+        <button onClick={submit} disabled={busy} style={btnPrimary("#2979FF")}>
           {busy ? "..." : "Confirmer"}
         </button>
       </div>
