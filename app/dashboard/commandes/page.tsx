@@ -22,6 +22,7 @@ interface Commande {
   clientNom: string;
   clientEmail: string;
   clientUid: string;
+  clientTelephone?: string;
   produits: { marque: string; modele: string; prix: number }[];
   total: number;
   methode: string;
@@ -47,6 +48,7 @@ function commandeFromDoc(id: string, m: Record<string, any>): Commande {
     clientNom:   m.clientNom   ?? "Client inconnu",
     clientEmail: m.clientEmail ?? "",
     clientUid:   m.clientUid   ?? "",
+    clientTelephone: m.clientTelephone ?? "",
     produits:    Array.isArray(m.produits) ? m.produits : [],
     total:       Number(m.total ?? 0),
     methode:     m.methode ?? "",
@@ -139,11 +141,21 @@ export default function CommandesPage() {
 
   const openWhatsApp = (c: Commande) => {
     const msg = encodeURIComponent(
-      `Bonjou ${c.clientNom},\n\nKòmand ou a (${c.produits
-        .map((p) => `${p.marque} ${p.modele}`)
-        .join(", ")}) — $${c.total.toFixed(0)} — estatou: ${c.statut}.\n\nMèsi pou konfyans ou!`
+      `Bonjour ${c.clientNom},\n\nNous avons reçu votre commande.\n\nVotre commande est en attente, veuillez faire le dépôt, ou passer directement payer dans notre local MillionStore.\n\nNotre adresse:\nDelmas 83, à proximité du BUH, à côté du CEDEC, Port-au-Prince, Haïti\n\nMerci pour votre confiance !`
     );
-    window.open(`https://wa.me/?text=${msg}`, "_blank");
+
+    let phone = (c.clientTelephone ?? "").replace(/[^0-9]/g, "");
+
+    if (!phone) {
+      alert("Pa gen nimewo telefòn pou kliyan sa a.");
+      return;
+    }
+
+    if (!phone.startsWith("509")) {
+      phone = "509" + phone;
+    }
+
+    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
   };
 
   // ── Statu yo yon itilizatè gen dwa chwazi (menm jan ak _allowedStatuts) ──
@@ -267,6 +279,11 @@ export default function CommandesPage() {
                       <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
                         {commande.clientEmail} • {commande.createdAt ? new Date(commande.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
                       </p>
+                      {commande.clientTelephone && (
+                        <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#555" }}>
+                          📞 {commande.clientTelephone}
+                        </p>
+                      )}
                     </div>
                     <span style={{ background: statutInfo.bg, color: statutInfo.color, padding: "4px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 700 }}>
                       {statutInfo.icon} {commande.statut}
@@ -275,9 +292,9 @@ export default function CommandesPage() {
 
                   {/* Pwodwi yo */}
                   <div style={{ padding: "12px 16px", borderBottom: "1px solid #f5f5f5" }}>
-                    {commande.produits?.map((p, i) => (
+                    {commande.produits?.map((p: any, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
-                        <span>• {p.marque} {p.modele}</span>
+                        <span>• {p.marque} {p.modele} {p.id ? <span style={{ color: "#aaa", fontSize: "12px" }}>(ID: {p.id})</span> : null}</span>
                         <span style={{ fontWeight: 700 }}>${Number(p.prix).toLocaleString()}</span>
                       </div>
                     ))}

@@ -57,17 +57,20 @@ const [loadingAchats, setLoadingAchats] = useState(true);
       } catch (_) {}
       setLoading(false);
   
-      // Chaje istwa achte
-      try {
-        const q = query(
-          collection(db, "achats"),
-          where("clientUid", "==", session.uid),
-          orderBy("createdAt", "desc")
-        );
-        const aSnap = await getDocs(q);
-        setAchats(aSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (_) {}
-      setLoadingAchats(false);
+     // Chaje istwa achte
+     try {
+      const q = query(
+        collection(db, "achats"),
+        where("clientUid", "==", session.uid)
+      );
+      const aSnap = await getDocs(q);
+      const list = aSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      list.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+      setAchats(list);
+    } catch (e) {
+      console.error("Erè chaje kòmand:", e);
+    }
+    setLoadingAchats(false);
     };
     loadData();
   }, [router]);
@@ -166,8 +169,30 @@ const [loadingAchats, setLoadingAchats] = useState(true);
           </button>
         </div>
 
-        {/* Istwa Achte */}
-<div style={{ background: "#fff", borderRadius: "20px", padding: "24px", marginBottom: "16px", border: "1px solid #eee" }}>
+       {/* Istwa Achte — Dashboard */}
+<div style={{ marginBottom: "16px" }}>
+
+{/* Estatistik rapid */}
+<div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
+  <div style={{ background: "#fff", borderRadius: "16px", padding: "16px 12px", border: "1px solid #eee", textAlign: "center" }}>
+    <p style={{ margin: "0 0 2px", fontSize: "22px", fontWeight: 900, color: "#1a1a2e" }}>{achats.length}</p>
+    <p style={{ margin: 0, fontSize: "11px", color: "#888", fontWeight: 600 }}>Commandes</p>
+  </div>
+  <div style={{ background: "#fff", borderRadius: "16px", padding: "16px 12px", border: "1px solid #eee", textAlign: "center" }}>
+    <p style={{ margin: "0 0 2px", fontSize: "22px", fontWeight: 900, color: "#f57c00" }}>
+      {achats.filter((a: any) => a.statut === "En attente").length}
+    </p>
+    <p style={{ margin: 0, fontSize: "11px", color: "#888", fontWeight: 600 }}>En attente</p>
+  </div>
+  <div style={{ background: "#fff", borderRadius: "16px", padding: "16px 12px", border: "1px solid #eee", textAlign: "center" }}>
+    <p style={{ margin: "0 0 2px", fontSize: "22px", fontWeight: 900, color: "#6a1b9a" }}>
+      {achats.filter((a: any) => a.statut === "Livré").length}
+    </p>
+    <p style={{ margin: 0, fontSize: "11px", color: "#888", fontWeight: 600 }}>Livrées</p>
+  </div>
+</div>
+
+<div style={{ background: "#fff", borderRadius: "20px", padding: "24px", border: "1px solid #eee" }}>
   <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "#1a1a2e" }}>🛍️ Mes Commandes</h3>
 
   {loadingAchats ? (
@@ -181,54 +206,103 @@ const [loadingAchats, setLoadingAchats] = useState(true);
       </a>
     </div>
   ) : (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      {achats.map((achat) => (
-        <div key={achat.id} style={{ background: "#f8f9fa", borderRadius: "14px", padding: "14px 16px", border: "1px solid #eee" }}>
-          {/* Statut */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-            <span style={{
-              background:
-                achat.statut === "Confirmé" ? "#e8f5e9" :
-                achat.statut === "En livraison" ? "#e3f2fd" :
-                achat.statut === "Livré" ? "#f3e5f5" :
-                achat.statut === "Annulé" ? "#fdecea" : "#fff8e1",
-              color:
-                achat.statut === "Confirmé" ? "#2e7d32" :
-                achat.statut === "En livraison" ? "#1565c0" :
-                achat.statut === "Livré" ? "#6a1b9a" :
-                achat.statut === "Annulé" ? "#c0392b" : "#f57c00",
-              padding: "4px 12px", borderRadius: "999px",
-              fontSize: "12px", fontWeight: 700,
-            }}>
-              {achat.statut === "Confirmé" ? "✅" :
-               achat.statut === "En livraison" ? "🚚" :
-               achat.statut === "Livré" ? "📦" :
-               achat.statut === "Annulé" ? "❌" : "⏳"} {achat.statut}
-            </span>
-            <span style={{ fontSize: "11px", color: "#aaa" }}>
-              {new Date(achat.createdAt).toLocaleDateString("fr-FR")}
-            </span>
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {achats.map((achat: any) => {
+        const statutColors: Record<string, { bg: string; color: string; icon: string; msg: string }> = {
+          "En attente":   { bg: "#fff8e1", color: "#f57c00", icon: "⏳", msg: "Votre commande n'est pas encore payée. Veuillez effectuer votre dépôt, ou passer directement payer dans notre local MillionStore." },
+          "Confirmé":     { bg: "#e8f5e9", color: "#2e7d32", icon: "✅", msg: "Paiement confirmé ! Votre commande sera bientôt en préparation." },
+          "En livraison": { bg: "#e3f2fd", color: "#1565c0", icon: "🚚", msg: "Votre commande est en route et sera bientôt livrée." },
+          "Livré":        { bg: "#f3e5f5", color: "#6a1b9a", icon: "📦", msg: "Commande livrée. Merci pour votre confiance !" },
+          "Annulé":       { bg: "#fdecea", color: "#c0392b", icon: "❌", msg: "Commande annulée. Contactez-nous pour plus d'informations." },
+        };
+        const s = statutColors[achat.statut] ?? statutColors["En attente"];
 
-          {/* Pwodwi yo */}
-          {achat.produits?.map((p: any, i: number) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#333", marginBottom: "4px" }}>
-              <span>• {p.marque} {p.modele}</span>
-              <span style={{ fontWeight: 700 }}>${Number(p.prix).toLocaleString()}</span>
+        // Etap pwosesis la (pa gen etap pou "Annulé")
+        const steps = ["En attente", "Confirmé", "En livraison", "Livré"];
+        const currentStepIndex = steps.indexOf(achat.statut);
+        const isCancelled = achat.statut === "Annulé";
+
+        return (
+          <div key={achat.id} style={{ borderRadius: "18px", border: `1.5px solid ${s.color}35`, overflow: "hidden", boxShadow: `0 2px 10px ${s.color}12` }}>
+
+            {/* Header — statut + dat */}
+            <div style={{ background: s.bg, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ color: s.color, fontWeight: 800, fontSize: "13px" }}>{s.icon} {achat.statut}</span>
+              <span style={{ fontSize: "11px", color: s.color, opacity: 0.8 }}>
+                {new Date(achat.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
             </div>
-          ))}
 
-          {/* Total + Metòd */}
-          <div style={{ borderTop: "1px solid #eee", marginTop: "10px", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "12px", color: "#888" }}>Via {achat.methode}</span>
-            <span style={{ fontWeight: 800, fontSize: "16px", color: "#1a1a2e" }}>
-              Total: ${Number(achat.total).toLocaleString()}
-            </span>
+            {/* Progress stepper */}
+            {!isCancelled && (
+              <div style={{ padding: "16px 20px 8px", background: "#fff" }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  {steps.map((step, i) => (
+                    <div key={step} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : "0 0 auto" }}>
+                      <div style={{
+                        width: "22px", height: "22px", borderRadius: "50%",
+                        background: i <= currentStepIndex ? s.color : "#e8e8e8",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "11px", color: "#fff", fontWeight: 700, flexShrink: 0,
+                      }}>
+                        {i <= currentStepIndex ? "✓" : ""}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div style={{ flex: 1, height: "3px", background: i < currentStepIndex ? s.color : "#e8e8e8", margin: "0 2px" }} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span style={{ fontSize: "9px", color: "#999", width: "40px" }}>Attente</span>
+                  <span style={{ fontSize: "9px", color: "#999", textAlign: "center", width: "50px" }}>Confirmé</span>
+                  <span style={{ fontSize: "9px", color: "#999", textAlign: "center", width: "50px" }}>Livraison</span>
+                  <span style={{ fontSize: "9px", color: "#999", textAlign: "right", width: "40px" }}>Livré</span>
+                </div>
+              </div>
+            )}
+
+            {/* Tableau pwodwi */}
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", marginTop: isCancelled ? 0 : "8px" }}>
+              <thead>
+                <tr style={{ background: "#fafafa" }}>
+                  <th style={{ textAlign: "left", padding: "8px 16px", fontSize: "11px", color: "#999", fontWeight: 700, textTransform: "uppercase" }}>Produit</th>
+                  <th style={{ textAlign: "right", padding: "8px 16px", fontSize: "11px", color: "#999", fontWeight: 700, textTransform: "uppercase" }}>Prix</th>
+                </tr>
+              </thead>
+              <tbody>
+                {achat.produits?.map((p: any, i: number) => (
+                  <tr key={i} style={{ borderTop: "1px solid #f5f5f5" }}>
+                    <td style={{ padding: "8px 16px", color: "#333" }}>
+                      {p.marque} {p.modele}
+                      {p.id && <span style={{ color: "#bbb", fontSize: "11px" }}> (ID: {p.id})</span>}
+                    </td>
+                    <td style={{ padding: "8px 16px", textAlign: "right", fontWeight: 700, color: "#333" }}>
+                      ${Number(p.prix).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: "2px solid #eee", background: "#fafafa" }}>
+                  <td style={{ padding: "10px 16px", fontWeight: 800, color: "#1a1a2e" }}>Total ({achat.methode})</td>
+                  <td style={{ padding: "10px 16px", textAlign: "right", fontWeight: 800, fontSize: "15px", color: "#1a1a2e" }}>
+                    ${Number(achat.total).toLocaleString()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Mesaj eksplikasyon */}
+            <div style={{ padding: "10px 16px", background: `${s.color}08` }}>
+              <p style={{ margin: 0, fontSize: "12px", color: s.color, lineHeight: 1.6 }}>{s.msg}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   )}
+</div>
 </div>
 
         {/* Aksyon rapid */}

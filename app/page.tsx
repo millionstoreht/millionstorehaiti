@@ -159,9 +159,14 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
   onClose: () => void; onPaymentConfirmed?: () => void;
   siteConfig?: Record<string, any>;
 }) {
-  const [step, setStep] = useState<"choose" | "moncash" | "natcash" | "bank" | "confirm">("choose");
+  const [step, setStep] = useState<"choose" | "moncash" | "natcash" | "bank" | "infos" | "confirm">("choose");
   const [selectedBank, setSelectedBank] = useState("BNC");
   const [showInfo, setShowInfo] = useState(false);
+  const [telephone, setTelephone] = useState("");
+  const [nom, setNom] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [infosError, setInfosError] = useState("");
+  const [pendingMethod, setPendingMethod] = useState<"moncash" | "natcash" | "bank" | null>(null);
 
   const checkoutItems = products?.length ? products : product ? [product] : [];
   const total = checkoutItems.reduce((s, i) => s + Number(i.prixVente || 0), 0);
@@ -191,6 +196,12 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
     return () => { document.body.style.overflow = ""; };
   }, []);
 
+  const goToInfos = (method: "moncash" | "natcash" | "bank") => {
+    setPendingMethod(method);
+    setInfosError("");
+    setStep("infos");
+  };
+
   const handleConfirm = async (method: "moncash" | "natcash" | "bank") => {
     setStep("confirm");
     onPaymentConfirmed?.();
@@ -204,8 +215,10 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
         
         await addDoc(collection(db, "achats"), {
           clientUid: client.uid,
-          clientNom: client.nom,
+          clientNom: nom.trim() || client.nom,
           clientEmail: client.email,
+          clientTelephone: telephone.trim(),
+          clientAdresse: adresse.trim(),
           produits: checkoutItems.map(i => ({
             id: i.id,
             marque: i.marque,
@@ -224,9 +237,9 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
     }
 
     // Voye WhatsApp
-    const lines = checkoutItems.map((i, idx) => `${idx + 1}. ${i.marque} ${i.modele} - $${Number(i.prixVente).toLocaleString()}`).join("%0A");
+    const lines = checkoutItems.map((i, idx) => `${idx + 1}. ${i.marque} ${i.modele} (ID: ${i.id}) - $${Number(i.prixVente).toLocaleString()}`).join("%0A");
     const bankLine = method === "bank" ? `%0ABanque: ${selectedBank}` : "";
-    const msg = `Bonjou MillionStore,%0A%0AUn client a payé.%0A%0AMéthode: ${METHOD_LABELS[method]}${bankLine}%0A%0AProduits:%0A${lines}%0A%0ATotal: $${Number(total).toLocaleString()}`;
+    const msg = `Bonjour MillionStore,%0A%0AUn client a passé une commande.%0A%0ANom: ${nom.trim()}%0ATéléphone: ${telephone.trim()}%0AAdresse: ${adresse.trim()}%0A%0AMéthode de paiement choisie: ${METHOD_LABELS[method]}${bankLine}%0A%0AProduits:%0A${lines}%0A%0ATotal: $${Number(total).toLocaleString()}%0A%0A⏳ En attente de confirmation du paiement.`;
     window.open(`https://wa.me/${whatsappNum}?text=${msg}`, "_blank", "noopener,noreferrer");
   };
 
@@ -251,13 +264,14 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
               </div>
             )}
             <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "0 0 16px" }} />
-            <p style={{ fontSize: "12px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Choisir méthode de paiement</p>
-            {[
-              { key: "moncash", label: "MonCash", sub: "Payer avec MonCash", color: "#E8011A", icon: "M" },
-              { key: "natcash", label: "NatCash", sub: "Payer avec NatCash", color: "#004B87", icon: "N" },
-              { key: "bank",    label: "Virement Bancaire", sub: "BNC, Sogebank, BUH, UNIBANK", color: "#1D5F2B", icon: "🏦" },
-            ].map(({ key, label, sub, color, icon }) => (
-              <button key={key} onClick={() => setStep(key as any)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", borderRadius: "12px", border: "1px solid #eee", background: "#fff", cursor: "pointer", marginBottom: "10px", textAlign: "left" }}>
+
+<p style={{ fontSize: "12px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Choisir méthode de paiement</p>
+{[
+  { key: "moncash", label: "MonCash", sub: "Payer avec MonCash", color: "#E8011A", icon: "M" },
+  { key: "natcash", label: "NatCash", sub: "Payer avec NatCash", color: "#004B87", icon: "N" },
+  { key: "bank",    label: "Virement Bancaire", sub: "BNC, Sogebank, BUH, UNIBANK", color: "#1D5F2B", icon: "🏦" },
+].map(({ key, label, sub, color, icon }) => (
+  <button key={key} onClick={() => setStep(key as any)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", borderRadius: "12px", border: "1px solid #eee", background: "#fff", cursor: "pointer", marginBottom: "10px", textAlign: "left" }}>
                 <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: "18px", flexShrink: 0 }}>{icon}</div>
                 <div style={{ flex: 1 }}>
                   <p style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#111" }}>{label}</p>
@@ -279,7 +293,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
           </>
         )}
 
-        {(step === "moncash" || step === "natcash") && (
+{(step === "moncash" || step === "natcash") && (
           <>
             <button onClick={() => setStep("choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#888", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
@@ -294,7 +308,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
               <p style={{ fontSize: "20px", fontWeight: 800, color: "#111", margin: 0, letterSpacing: "1px" }}>{step === "moncash" ? moncashNum : natcashNum}</p>
               <p style={{ fontSize: "12px", color: "#888", margin: "6px 0 0" }}>Nom: {step === "moncash" ? moncashNom : natcashNom}</p>
             </div>
-            <button onClick={() => handleConfirm(step)} style={{ width: "100%", padding: "14px", background: activeColor, color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>Confirmer le paiement</button>
+            <button onClick={() => goToInfos(step as "moncash" | "natcash")} style={{ width: "100%", padding: "14px", background: activeColor, color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>Confirmer le paiement</button>
           </>
         )}
 
@@ -322,7 +336,55 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
                 </div>
               ))}
             </div>
-            <button onClick={() => handleConfirm("bank")} style={{ width: "100%", padding: "14px", background: "#1D5F2B", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>Confirmer le paiement</button>
+            <button onClick={() => goToInfos("bank")} style={{ width: "100%", padding: "14px", background: "#1D5F2B", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>Confirmer le paiement</button>
+          </>
+        )}
+
+        {step === "infos" && (
+          <>
+            <button onClick={() => setStep(pendingMethod ?? "choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#888", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
+            <p style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 800, color: "#111" }}>Vos informations</p>
+            <p style={{ margin: "0 0 20px", fontSize: "13px", color: "#888" }}>Ces informations nous permettent de vous contacter pour confirmer votre commande.</p>
+
+            {infosError && (
+              <div style={{ background: "#fff0f0", color: "#e63946", padding: "10px 12px", borderRadius: "10px", fontSize: "12px", marginBottom: "14px" }}>⚠️ {infosError}</div>
+            )}
+
+<p style={{ fontSize: "11px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Nom complet</p>
+            <input
+              type="text"
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit" }}
+            />
+
+            <p style={{ fontSize: "11px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Numéro de téléphone</p>
+            <input
+              type="tel"
+              value={telephone}
+              onChange={(e) => setTelephone(e.target.value)}
+              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit" }}
+            />
+
+            <p style={{ fontSize: "11px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Adresse de livraison</p>
+            <input
+              type="text"
+              value={adresse}
+              onChange={(e) => setAdresse(e.target.value)}
+              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", marginBottom: "20px", boxSizing: "border-box", fontFamily: "inherit" }}
+            />
+            <button
+              onClick={() => {
+                if (!nom.trim() || !telephone.trim() || !adresse.trim()) {
+                  setInfosError("Veuillez remplir tous les champs avant de continuer.");
+                  return;
+                }
+                if (pendingMethod) handleConfirm(pendingMethod);
+              }}
+              style={{ width: "100%", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}
+            >
+              Confirmer la commande
+            </button>
           </>
         )}
 
