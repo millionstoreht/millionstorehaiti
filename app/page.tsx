@@ -662,6 +662,7 @@ export default function Home() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showGoogleForCart, setShowGoogleForCart] = useState(false);
 const [pendingCartProduct, setPendingCartProduct] = useState<Product | null>(null);
+  const [showGoogleForCommandes, setShowGoogleForCommandes] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [showLivraison, setShowLivraison] = useState(false);
 const [showGarantie, setShowGarantie] = useState(false);
@@ -836,6 +837,15 @@ const [showGarantie, setShowGarantie] = useState(false);
         setCheckoutProducts(cart);
       }
       setPendingCartProduct(null);
+    }}
+  />
+)}
+      {showGoogleForCommandes && (
+  <GoogleLoginModal
+    onClose={() => setShowGoogleForCommandes(false)}
+    onSuccess={() => {
+      setShowGoogleForCommandes(false);
+      window.location.href = "/mon-compte";
     }}
   />
 )}
@@ -1056,21 +1066,17 @@ const [showGarantie, setShowGarantie] = useState(false);
           <span style={{ fontSize: "10px", color: "#25D366", fontWeight: 700 }}>WhatsApp</span>
         </button>
 
-        {/* Mon Compte */}
+        {/* Mes Commandes */}
         <button onClick={() => {
-  const staff = localStorage.getItem("ms_web_user");
   const client = localStorage.getItem("ms_client_user");
-  if (staff) { window.location.href = "/dashboard"; return; }
   if (client) { window.location.href = "/mon-compte"; return; }
-  window.location.href = "/login";
+  setShowGoogleForCommandes(true);
 }} style={{ flex: 1, padding: "10px 8px", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
   <span style={{ fontSize: "20px" }}>
-    {mounted && !!localStorage.getItem("ms_web_user") ? "✅" : 
-     mounted && !!localStorage.getItem("ms_client_user") ? "🛍️" : "👤"}
+    {mounted && !!localStorage.getItem("ms_client_user") ? "🛍️" : "👤"}
   </span>
   <span style={{ fontSize: "10px", color: "#666", fontWeight: 600 }}>
-    {mounted && !!localStorage.getItem("ms_client_user") && !localStorage.getItem("ms_web_user") 
-      ? "Mes Commandes" : "Mon Compte"}
+    Mes Commandes
   </span>
 </button>
       </div>

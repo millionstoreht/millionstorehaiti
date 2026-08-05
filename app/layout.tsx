@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import InstallBanner from "./components/InstallBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,6 +54,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg" />
       </head>
       <body className="min-h-full flex flex-col">
+        <InstallBanner />
         {children}
         <script dangerouslySetInnerHTML={{
           __html: `
@@ -61,6 +63,13 @@ export default function RootLayout({
                 navigator.serviceWorker.register('/sw.js');
               });
             }
+
+            window.deferredInstallPrompt = null;
+            window.addEventListener('beforeinstallprompt', function(e) {
+              e.preventDefault();
+              window.deferredInstallPrompt = e;
+              window.dispatchEvent(new Event('ms-install-available'));
+            });
           `
         }} />
       </body>

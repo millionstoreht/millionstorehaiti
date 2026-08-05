@@ -305,26 +305,40 @@ const [loadingAchats, setLoadingAchats] = useState(true);
 </div>
 </div>
 
-        {/* Aksyon rapid */}
-        <div style={{ background: "#fff", borderRadius: "20px", padding: "20px", border: "1px solid #eee" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "#1a1a2e" }}>⚡ Actions rapides</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <a href="/" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: "#f8f9fa", borderRadius: "12px", textDecoration: "none", color: "#1a1a2e", fontWeight: 600, fontSize: "15px" }}>
-              🛒 <span>Retourner à la boutique</span>
-            </a>
-            <button
-              onClick={() => window.open(`https://wa.me/50938332483`, "_blank", "noopener,noreferrer")}
-              style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: "#f0fff4", borderRadius: "12px", border: "none", cursor: "pointer", color: "#25D366", fontWeight: 600, fontSize: "15px", fontFamily: "inherit" }}
-            >
-              💬 <span>Contacter MillionStore</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: "#fff5f5", borderRadius: "12px", border: "none", cursor: "pointer", color: "#e63946", fontWeight: 600, fontSize: "15px", fontFamily: "inherit" }}
-            >
-              🚪 <span>Se déconnecter</span>
-            </button>
-          </div>
+        {/* Aksyon rapid — 3 gros bouton */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+          <a href="/" style={{
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px",
+            padding: "20px 10px", background: "#fff", borderRadius: "18px", border: "1px solid #eee",
+            textDecoration: "none", color: "#1a1a2e", fontWeight: 700, fontSize: "13px",
+          }}>
+            <span style={{ fontSize: "26px" }}>🛒</span>
+            <span>Boutique</span>
+          </a>
+
+          <button
+            onClick={() => window.open(`https://wa.me/50938332483`, "_blank", "noopener,noreferrer")}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px",
+              padding: "20px 10px", background: "#f0fff4", borderRadius: "18px", border: "1px solid #d0f0d8",
+              cursor: "pointer", color: "#25D366", fontWeight: 700, fontSize: "13px", fontFamily: "inherit",
+            }}
+          >
+            <span style={{ fontSize: "26px" }}>💬</span>
+            <span>WhatsApp</span>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px",
+              padding: "20px 10px", background: "#fff5f5", borderRadius: "18px", border: "1px solid #f5d5d5",
+              cursor: "pointer", color: "#e63946", fontWeight: 700, fontSize: "13px", fontFamily: "inherit",
+            }}
+          >
+            <span style={{ fontSize: "26px" }}>🚪</span>
+            <span>Déconnecter</span>
+          </button>
         </div>
       </div>
     </main>
