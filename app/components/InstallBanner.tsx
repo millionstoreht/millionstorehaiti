@@ -93,16 +93,20 @@ export default function InstallBanner() {
               Installer sur iPhone
             </h3>
             <div style={{ textAlign: "left", background: "#f8f9fa", borderRadius: "14px", padding: "16px" }}>
-              <p style={{ margin: "0 0 12px", fontSize: "14px", color: "#333", display: "flex", alignItems: "center", gap: "8px" }}>
+              <p style={{ margin: "0 0 12px", fontSize: "14px", color: "#333", display: "flex", alignItems: "flex-start", gap: "8px" }}>
                 <span style={{ background: "#1a1a2e", color: "#fff", borderRadius: "50%", width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink: 0 }}>1</span>
-                Appuyez sur l'icône <strong>Partager</strong> ⬆️ en bas de Safari
+                Appuyez sur les <strong>3 petits points (⋯)</strong> en bas de l'écran
               </p>
-              <p style={{ margin: "0 0 12px", fontSize: "14px", color: "#333", display: "flex", alignItems: "center", gap: "8px" }}>
+              <p style={{ margin: "0 0 12px", fontSize: "14px", color: "#333", display: "flex", alignItems: "flex-start", gap: "8px" }}>
                 <span style={{ background: "#1a1a2e", color: "#fff", borderRadius: "50%", width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink: 0 }}>2</span>
-                Faites défiler et appuyez sur <strong>« Sur l'écran d'accueil »</strong>
+                Appuyez sur <strong>« Partager »</strong>
               </p>
-              <p style={{ margin: 0, fontSize: "14px", color: "#333", display: "flex", alignItems: "center", gap: "8px" }}>
+              <p style={{ margin: "0 0 12px", fontSize: "14px", color: "#333", display: "flex", alignItems: "flex-start", gap: "8px" }}>
                 <span style={{ background: "#1a1a2e", color: "#fff", borderRadius: "50%", width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink: 0 }}>3</span>
+                Descendez et appuyez sur <strong>« Sur l'écran d'accueil »</strong>
+              </p>
+              <p style={{ margin: 0, fontSize: "14px", color: "#333", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                <span style={{ background: "#1a1a2e", color: "#fff", borderRadius: "50%", width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink: 0 }}>4</span>
                 Appuyez sur <strong>« Ajouter »</strong>
               </p>
             </div>
