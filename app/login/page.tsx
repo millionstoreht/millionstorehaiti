@@ -460,9 +460,6 @@ export default function LoginPage() {
         )}
 
         {/* Staff Login */}
-        <p style={{ margin: "0 0 14px", fontSize: "13px", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-          👤 Espace Staff / Admin
-        </p>
 
         <div style={{ position: "relative", marginBottom: "12px" }}>
           <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>👤</span>
