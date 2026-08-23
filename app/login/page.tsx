@@ -183,17 +183,24 @@ const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [rep3, setRep3]         = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   const goToSecurity = async () => {
-    if (!nom.trim() || !prenom.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
-      setError("Tous les champs sont obligatoires."); return;
+    if (checkingUsername) return;
+    setCheckingUsername(true);
+    try {
+      if (!nom.trim() || !prenom.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
+        setError("Tous les champs sont obligatoires."); return;
+      }
+      if (password.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
+      if (password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return; }
+      // Vérifie si le username existe déjà
+      const snap = await getDoc(doc(db, "users", username.trim()));
+      if (snap.exists()) { setError("Ce nom d'utilisateur est déjà pris. Choisissez-en un autre."); return; }
+      setError(""); setStep("security");
+    } finally {
+      setCheckingUsername(false);
     }
-    if (password.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
-    if (password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return; }
-    // Vérifie si le username existe déjà
-    const snap = await getDoc(doc(db, "users", username.trim()));
-    if (snap.exists()) { setError("Ce nom d'utilisateur est déjà pris. Choisissez-en un autre."); return; }
-    setError(""); setStep("security");
   };
 
   const submit = async () => {
@@ -318,8 +325,19 @@ const [showConfirmPass, setShowConfirmPass] = useState(false);
               {confirmPassword && confirmPassword !== password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#e63946" }}>❌ Les mots de passe ne correspondent pas</p>}
               {confirmPassword && confirmPassword === password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#1a9e6e" }}>✅ Les mots de passe correspondent</p>}
 
-              <button onClick={goToSecurity} style={{ width: "100%", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                Suivant → Questions de sécurité
+              <button 
+                onClick={goToSecurity} 
+                disabled={checkingUsername}
+                style={{ 
+                  width: "100%", padding: "14px", 
+                  background: checkingUsername ? "#888" : "#1a1a2e", 
+                  color: "#fff", border: "none", borderRadius: "14px", 
+                  fontSize: "14px", fontWeight: 800, 
+                  cursor: checkingUsername ? "not-allowed" : "pointer", 
+                  fontFamily: "inherit" 
+                }}
+              >
+                {checkingUsername ? "⏳ Vérification..." : "Suivant → Questions de sécurité"}
               </button>
             </>
           )}
