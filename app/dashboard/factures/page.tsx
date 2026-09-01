@@ -635,8 +635,7 @@ export default function FacturePage() {
       const match =
   v.factureId != null &&
   v.factureId === facture.id &&
-  v.billNo === facture.billNo &&
-  v.date === facture.date;
+  v.billNo === facture.billNo;
       if (match) {
         gainRetire += v.gainTotal ?? 0;
         hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: facture.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
@@ -807,8 +806,7 @@ export default function FacturePage() {
             const match =
   v.factureId != null &&
   v.factureId === f.id &&
-  v.billNo === f.billNo &&
-  v.date === f.date;
+  v.billNo === f.billNo;
             if (match) {
               gainRetire += v.gainTotal ?? 0;
               hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: f.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
