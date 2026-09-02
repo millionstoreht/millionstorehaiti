@@ -57,6 +57,7 @@ interface HistEntry {
 interface Vendeur {
   id: string;
   nom: string;
+  telephone?: string;
   balance: number;
   ventes: Vente[];
   historique?: HistEntry[];
@@ -151,6 +152,7 @@ export default function VendeursPage() {
   const [selectedVendeur, setSelectedVendeur] = useState<{v:Vendeur,color:string}|null>(null);
   const [releveVendeur, setReleveVendeur]     = useState<{v:Vendeur,color:string}|null>(null);
   const [showAddModal, setShowAddModal]       = useState(false);
+  const [showEditPhoneModal, setShowEditPhoneModal] = useState<Vendeur|null>(null);
   const [showCommModal, setShowCommModal]     = useState(false);
   const [showRetraitModal, setShowRetraitModal] = useState<Vendeur|null>(null);
   const [showDepotModal, setShowDepotModal] = useState<Vendeur|null>(null);
@@ -158,6 +160,7 @@ export default function VendeursPage() {
   const [showDeleteBlocked, setShowDeleteBlocked] = useState<Vendeur|null>(null);
   const [showSiprimeConfirm, setShowSiprimeConfirm] = useState<{v:Vendeur,t:Vente}|null>(null);
   const [newNom, setNewNom]     = useState("");
+  const [newTel, setNewTel]     = useState("");
   const [localId, setLocalId]   = useState("all");
   const [snackMsg, setSnackMsg] = useState("");
   const [snackColor, setSnackColor] = useState("#00C853");
@@ -207,7 +210,8 @@ export default function VendeursPage() {
             vendSnap.forEach(d => {
               const data = d.data();
               allVendeurs.push({
-                id: d.id, nom: data.nom ?? "", balance: Number(data.balance ?? 0),
+                id: d.id, nom: data.nom ?? "", telephone: data.telephone ?? "",
+                balance: Number(data.balance ?? 0),
                 ventes: data.ventes ?? [], historique: data.historique ?? [],
                 localId: localDoc.id,
               });
@@ -227,7 +231,8 @@ export default function VendeursPage() {
       snap.forEach(d => {
         const data = d.data();
         list.push({
-          id: d.id, nom: data.nom ?? "", balance: Number(data.balance ?? 0),
+          id: d.id, nom: data.nom ?? "", telephone: data.telephone ?? "",
+          balance: Number(data.balance ?? 0),
           ventes: data.ventes ?? [], historique: data.historique ?? [],
           localId: localId,
         });
@@ -246,9 +251,9 @@ export default function VendeursPage() {
   // ─── ACTIONS ─────────────────────────────────────────────────────────────
   const addVendeur = async () => {
     if (!newNom.trim() || localId === "all") return;
-    const v: Vendeur = { id: Date.now().toString(), nom: newNom.trim(), balance: 0, ventes: [], historique: [], localId };
+    const v: Vendeur = { id: Date.now().toString(), nom: newNom.trim(), telephone: newTel.trim(), balance: 0, ventes: [], historique: [], localId };
     await setDoc(doc(db, "locals", localId, "vendeurs", v.id), v);
-    setNewNom(""); setShowAddModal(false);
+    setNewNom(""); setNewTel(""); setShowAddModal(false);
   };
 
   /** Retrait — l'admin entre un montant, refusé s'il dépasse le solde. Écriture
@@ -358,7 +363,27 @@ export default function VendeursPage() {
     } finally { setBusy(false); }
   };
 
-  const saveCommission = async (comm: Record<string,number>) => {
+    /** Modifie uniquement le numéro de téléphone du vendeur (identification,
+   *  n'affecte jamais le solde ni les ventes). */
+    const editPhoneVendeur = async (v: Vendeur, telephone: string) => {
+      if (busy) return;
+      setBusy(true);
+      const lid = v.localId ?? localId;
+      const ref = doc(db, "locals", lid, "vendeurs", v.id);
+      try {
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) throw new Error("Vendeur introuvable");
+          tx.update(ref, { telephone });
+        });
+        snack("✅ Numéro mis à jour.", "#00C853");
+        setShowEditPhoneModal(null);
+      } catch (e) {
+        snack("❌ " + (e instanceof Error ? e.message : "Erè"), "red");
+      } finally { setBusy(false); }
+    };
+  
+    const saveCommission = async (comm: Record<string,number>) => {
     setCommission(comm);
     await setDoc(doc(db, "locals", "all"), { commission: comm }, { merge: true });
     setShowCommModal(false);
@@ -590,6 +615,9 @@ export default function VendeursPage() {
                           <span style={{ marginLeft:6, color:"#2979FF", fontSize:10 }}>[{v.localId}]</span>
                         )}
                       </p>
+                      {v.telephone && (
+                        <p style={{ margin:"2px 0 0", color:"#555", fontSize:11 }}>📞 {v.telephone}</p>
+                      )}
                     </div>
                     <div style={{ textAlign:"right" }}>
                       <p style={{ margin:0, color, fontWeight:700, fontSize:17 }}>
@@ -598,12 +626,20 @@ export default function VendeursPage() {
                       <p style={{ margin:0, color:"#3a3a3a", fontSize:10 }}>solde</p>
                     </div>
                     {user.isAdmin ? (
-                      <button onClick={e => { e.stopPropagation(); requestDeleteVendeur(v); }}
-                        title={v.balance === 0 ? "Supprimer" : "Solde non nul — paiement requis"}
-                        style={{ background:"none", border:"none", cursor:"pointer",
-                          color: v.balance === 0 ? "#ff4444" : "#2a2a2a", fontSize:20 }}>
-                        🗑
-                      </button>
+                      <>
+                        <button onClick={e => { e.stopPropagation(); setShowEditPhoneModal(v); }}
+                          title="Modifier le téléphone"
+                          style={{ background:"none", border:"none", cursor:"pointer",
+                            color:"#2979FF", fontSize:16, marginRight:4 }}>
+                          ✏️
+                        </button>
+                        <button onClick={e => { e.stopPropagation(); requestDeleteVendeur(v); }}
+                          title={v.balance === 0 ? "Supprimer" : "Solde non nul — paiement requis"}
+                          style={{ background:"none", border:"none", cursor:"pointer",
+                            color: v.balance === 0 ? "#ff4444" : "#2a2a2a", fontSize:20 }}>
+                          🗑
+                        </button>
+                      </>
                     ) : (
                       <span style={{ color:"#333", fontSize:18 }}>›</span>
                     )}
@@ -839,7 +875,9 @@ export default function VendeursPage() {
       {showAddModal && (
         <Modal title="Ajouter un vendeur" onClose={() => setShowAddModal(false)}>
           <input value={newNom} onChange={e => setNewNom(e.target.value)}
-            placeholder="Nom du vendeur" autoFocus style={inputStyle} />
+            placeholder="Nom du vendeur" autoFocus style={{ ...inputStyle, marginBottom:10 }} />
+          <input value={newTel} onChange={e => setNewTel(e.target.value)}
+            placeholder="Numéro de téléphone" style={inputStyle} />
           <div style={{ display:"flex", gap:8, marginTop:16 }}>
             <button onClick={() => setShowAddModal(false)} style={btnSecondary}>Annuler</button>
             <button onClick={addVendeur} style={btnPrimary("#00C853")}>Ajouter</button>
@@ -854,11 +892,18 @@ export default function VendeursPage() {
           onConfirm={(m) => retraitVendeur(showRetraitModal, m)} />
       )}
 
-      {/* ═══════════════ MODAL: DÉPÔT ═══════════════ */}
-      {showDepotModal && (
+            {/* ═══════════════ MODAL: DÉPÔT ═══════════════ */}
+            {showDepotModal && (
         <DepotModal v={showDepotModal} busy={busy}
           onClose={() => setShowDepotModal(null)}
           onConfirm={(m) => depotVendeur(showDepotModal, m)} />
+      )}
+
+      {/* ═══════════════ MODAL: TÉLÉPHONE ═══════════════ */}
+      {showEditPhoneModal && (
+        <EditPhoneModal v={showEditPhoneModal} busy={busy}
+          onClose={() => setShowEditPhoneModal(null)}
+          onConfirm={(tel) => editPhoneVendeur(showEditPhoneModal, tel)} />
       )}
 
       {/* ═══════════════ MODAL: CONFIRMASYON SIPRIME ═══════════════ */}
@@ -1041,6 +1086,28 @@ function DepotModal({ v, busy, onClose, onConfirm }: {
         <button onClick={onClose} style={btnSecondary}>Annuler</button>
         <button onClick={submit} disabled={busy} style={btnPrimary("#2979FF")}>
           {busy ? "..." : "Confirmer"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditPhoneModal({ v, busy, onClose, onConfirm }: {
+  v: Vendeur; busy: boolean; onClose: () => void; onConfirm: (telephone: string) => void;
+}) {
+  const [val, setVal] = useState(v.telephone ?? "");
+  return (
+    <Modal title="Numéro de téléphone" onClose={onClose}>
+      <p style={{ color:"#888", margin:"0 0 12px", fontSize:13 }}>
+        Vendeur : {v.nom}
+      </p>
+      <input value={val} autoFocus
+        onChange={e => setVal(e.target.value)}
+        placeholder="Numéro de téléphone" style={inputStyle} />
+      <div style={{ display:"flex", gap:8, marginTop:16 }}>
+        <button onClick={onClose} style={btnSecondary}>Annuler</button>
+        <button onClick={() => onConfirm(val.trim())} disabled={busy} style={btnPrimary("#2979FF")}>
+          {busy ? "..." : "Enregistrer"}
         </button>
       </div>
     </Modal>
