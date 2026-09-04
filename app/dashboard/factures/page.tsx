@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { db } from "../../../lib/firebase";
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc,
-  onSnapshot,
+  onSnapshot, runTransaction,
 } from "firebase/firestore";
 import {
   Package, History, ArrowLeft, Plus, Minus,
@@ -240,6 +240,31 @@ async function saveProduct(p: Product, localId: string) {
 }
 async function saveVendeur(v: Vendeur, localId: string) {
   await setDoc(subDoc(localId, "vendeurs", v.id), v);
+}
+
+/** Modifye yon vandè de manyè ATOMIK (transaksyon Firestore) — li dènye
+ *  vèsyon an dirèkteman, aplike [update], epi ekri rezilta a nan yon sèl
+ *  operasyon ki pa ka konfonn ak yon lòt aparèy k ap modifye menm vandè a
+ *  nan menm moman an. Retounen null si pa gen entènèt oswa si tranzaksyon
+ *  an echwe — nan ka sa a, aple a dwe tonbe sou ansyen metòd la. */
+async function updateVendeurAtomic(
+  localId: string,
+  vendeurId: string,
+  update: (current: Vendeur) => Vendeur
+): Promise<Vendeur | null> {
+  if (!navigator.onLine) return null;
+  const ref = subDoc(localId, "vendeurs", vendeurId);
+  try {
+    return await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const current = (snap.data() as Vendeur) ?? ({ id: vendeurId, nom: "", balance: 0, ventes: [], localId } as Vendeur);
+      const updated = update(current);
+      tx.set(ref, updated);
+      return updated;
+    });
+  } catch {
+    return null;
+  }
 }
 async function saveClient(c: Client, localId: string) {
   await setDoc(subDoc(localId, "clients", c.id), c);
@@ -598,16 +623,16 @@ export default function FacturePage() {
     if (!facture.vendeur) return;
     const vends = await loadVendeurs(localId);
     const idx = vends.findIndex(v => v.nom === facture.vendeur);
-    if (idx === -1) return;
-    const ventes = [...(vends[idx].ventes ?? [])];
-    const alreadyAdded = ventes.some(v =>
-      v.factureId != null &&
-      v.factureId === facture.id &&
-      v.billNo === facture.billNo &&
-      v.date === facture.date
-    );
-    if (alreadyAdded) return;
-    const hist = [...(vends[idx].historique ?? [])];
+    if (idx === -1) {
+      snack(`⚠️ Vendeur "${facture.vendeur}" introuvable — vente de la facture #${facture.billNo} non ajoutée à son solde.`, "red");
+      return;
+    }
+    const vendeurId = vends[idx].id;
+    const factureId = facture.id;
+    const billNo = facture.billNo;
+
+    const nouvellesVentes: VenteItem[] = [];
+    const nouveauHist: HistEntry[] = [];
     let totalGain = 0;
     for (const l of facture.lignes) {
       const pvUSD = facture.devise === "HTG" ? l.prix / facture.taux : l.prix;
@@ -615,11 +640,36 @@ export default function FacturePage() {
       const catKey = Object.keys(commission).find(k => k.toLowerCase() === l.category.toLowerCase()) ?? "";
       const gainKom = catKey ? commission[catKey] * l.qty : 0;
       totalGain += benefis + gainKom;
-      ventes.push({ ventId: `${Date.now()}_${l.productId}`, factureId: facture.id, id: l.productId, marque: l.marque, model: l.modele, categorie: l.category, prixAchat: l.prixAchat, prixVente: pvUSD, commission: gainKom, benefis, gainTotal: benefis + gainKom, qty: l.qty, billNo: facture.billNo, date: facture.date, clientNom: facture.clientNom, cashier: facture.cashier, description: l.description });
-      hist.push(histEntry({ type: "vente", montant: benefis + gainKom, description: "Vente ajoutée", venteId: l.productId, marque: l.marque, modele: l.modele, billNo: facture.billNo, clientNom: facture.clientNom, cashier: facture.cashier, produitDescription: l.description }));
+      nouvellesVentes.push({ ventId: `${Date.now()}_${l.productId}`, factureId: facture.id, id: l.productId, marque: l.marque, model: l.modele, categorie: l.category, prixAchat: l.prixAchat, prixVente: pvUSD, commission: gainKom, benefis, gainTotal: benefis + gainKom, qty: l.qty, billNo: facture.billNo, date: facture.date, clientNom: facture.clientNom, cashier: facture.cashier, description: l.description });
+      nouveauHist.push(histEntry({ type: "vente", montant: benefis + gainKom, description: "Vente ajoutée", venteId: l.productId, marque: l.marque, modele: l.modele, billNo: facture.billNo, clientNom: facture.clientNom, cashier: facture.cashier, produitDescription: l.description }));
     }
-    vends[idx].ventes = ventes;
-    vends[idx].historique = hist;
+
+    const result = await updateVendeurAtomic(localId, vendeurId, (current) => {
+      const curVentes = current.ventes ?? [];
+      const alreadyAdded = curVentes.some(v =>
+        v.factureId != null && v.factureId === factureId && v.billNo === billNo
+      );
+      if (alreadyAdded) return current;
+      return {
+        ...current,
+        ventes: [...curVentes, ...nouvellesVentes],
+        historique: [...(current.historique ?? []), ...nouveauHist],
+        balance: (current.balance ?? 0) + totalGain,
+      };
+    });
+    if (result !== null) {
+      setVendeurs(prev => prev.map(v => v.id === vendeurId ? result : v));
+      return;
+    }
+
+    // Fallback si transaksyon an pa reyisi
+    const ventes = vends[idx].ventes ?? [];
+    const alreadyAdded = ventes.some(v =>
+      v.factureId != null && v.factureId === factureId && v.billNo === billNo
+    );
+    if (alreadyAdded) return;
+    vends[idx].ventes = [...ventes, ...nouvellesVentes];
+    vends[idx].historique = [...(vends[idx].historique ?? []), ...nouveauHist];
     vends[idx].balance = (vends[idx].balance ?? 0) + totalGain;
     await saveVendeur(vends[idx], localId);
   }
@@ -628,14 +678,34 @@ export default function FacturePage() {
     if (!facture.vendeur) return;
     const vends = await loadVendeurs(localId);
     const idx = vends.findIndex(v => v.nom === facture.vendeur);
-    if (idx === -1) return;
+    if (idx === -1) {
+      snack(`⚠️ Vendeur "${facture.vendeur}" introuvable — annulation de la facture #${facture.billNo} n'a pas corrigé son solde.`, "red");
+      return;
+    }
+    const vendeurId = vends[idx].id;
+    const factureId = facture.id;
+    const billNo = facture.billNo;
+
+    const result = await updateVendeurAtomic(localId, vendeurId, (current) => {
+      let gainRetire = 0;
+      const historique = [...(current.historique ?? [])];
+      const ventes = (current.ventes ?? []).filter(v => {
+        const match = v.factureId != null && v.factureId === factureId && v.billNo === billNo;
+        if (match) {
+          gainRetire += v.gainTotal ?? 0;
+          historique.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: facture.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
+          return false;
+        }
+        return true;
+      });
+      return { ...current, ventes, historique, balance: Math.max(0, (current.balance ?? 0) - gainRetire) };
+    });
+    if (result !== null) return;
+
     let gainRetire = 0;
     const hist = [...(vends[idx].historique ?? [])];
     vends[idx].ventes = (vends[idx].ventes ?? []).filter(v => {
-      const match =
-  v.factureId != null &&
-  v.factureId === facture.id &&
-  v.billNo === facture.billNo;
+      const match = v.factureId != null && v.factureId === factureId && v.billNo === billNo;
       if (match) {
         gainRetire += v.gainTotal ?? 0;
         hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: facture.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
@@ -757,9 +827,14 @@ export default function FacturePage() {
   async function addVenteVendeur(vendeurNom: string, facture: Facture) {
     const vends = await loadVendeurs(localId);
     const idx = vends.findIndex(v => v.nom === vendeurNom);
-    if (idx === -1) return;
-    const newVentes = [...(vends[idx].ventes ?? [])];
-    const newHist = [...(vends[idx].historique ?? [])];
+    if (idx === -1) {
+      snack(`⚠️ Vendeur "${vendeurNom}" introuvable — vente de la facture #${facture.billNo} non ajoutée à son solde.`, "red");
+      return;
+    }
+    const vendeurId = vends[idx].id;
+
+    const nouvellesVentes: VenteItem[] = [];
+    const nouveauHist: HistEntry[] = [];
     let totalGain = 0;
     for (const l of lignes) {
       const pvUSD = devise === "HTG" ? l.prix / taux : l.prix;
@@ -768,11 +843,24 @@ export default function FacturePage() {
       const gainKom = catKey ? commission[catKey] * l.qty : 0;
       totalGain += benefis + gainKom;
       const ventId = `${Date.now()}_${l.productId}_${Math.random().toString(36).slice(2,7)}`;
-      newVentes.push({ ventId, factureId: facture.id, id: l.productId, marque: l.marque, model: l.modele, categorie: l.category, prixAchat: l.prixAchat, prixVente: pvUSD, commission: gainKom, benefis, gainTotal: benefis + gainKom, qty: l.qty, billNo: facture.billNo, date: facture.date, clientNom: facture.clientNom, cashier: facture.cashier, description: l.description });
-      newHist.push(histEntry({ type: "vente", montant: benefis + gainKom, description: "Vente ajoutée", venteId: l.productId, marque: l.marque, modele: l.modele, billNo: facture.billNo, clientNom: facture.clientNom, cashier: facture.cashier, produitDescription: l.description }));
+      nouvellesVentes.push({ ventId, factureId: facture.id, id: l.productId, marque: l.marque, model: l.modele, categorie: l.category, prixAchat: l.prixAchat, prixVente: pvUSD, commission: gainKom, benefis, gainTotal: benefis + gainKom, qty: l.qty, billNo: facture.billNo, date: facture.date, clientNom: facture.clientNom, cashier: facture.cashier, description: l.description });
+      nouveauHist.push(histEntry({ type: "vente", montant: benefis + gainKom, description: "Vente ajoutée", venteId: l.productId, marque: l.marque, modele: l.modele, billNo: facture.billNo, clientNom: facture.clientNom, cashier: facture.cashier, produitDescription: l.description }));
     }
-    vends[idx].ventes = newVentes;
-    vends[idx].historique = newHist;
+
+    const result = await updateVendeurAtomic(localId, vendeurId, (current) => ({
+      ...current,
+      ventes: [...(current.ventes ?? []), ...nouvellesVentes],
+      historique: [...(current.historique ?? []), ...nouveauHist],
+      balance: (current.balance ?? 0) + totalGain,
+    }));
+    if (result !== null) {
+      setVendeurs(prev => prev.map(v => v.id === vendeurId ? result : v));
+      return;
+    }
+
+    // Fallback (offline oswa echèk transaksyon)
+    vends[idx].ventes = [...(vends[idx].ventes ?? []), ...nouvellesVentes];
+    vends[idx].historique = [...(vends[idx].historique ?? []), ...nouveauHist];
     vends[idx].balance = (vends[idx].balance ?? 0) + totalGain;
     await saveVendeur(vends[idx], localId);
   }
@@ -799,24 +887,46 @@ export default function FacturePage() {
       if (f.vendeur) {
         const vends = await loadVendeurs(localId);
         const idx = vends.findIndex(v => v.nom === f.vendeur);
+        if (idx === -1) {
+          snack(`⚠️ Vendeur "${f.vendeur}" introuvable — solde non corrigé pour la facture #${f.billNo}.`, "red");
+        }
         if (idx !== -1) {
-          let gainRetire = 0;
-          const hist = [...(vends[idx].historique ?? [])];
-          vends[idx].ventes = (vends[idx].ventes ?? []).filter((v: VenteItem) => {
-            const match =
-  v.factureId != null &&
-  v.factureId === f.id &&
-  v.billNo === f.billNo;
-            if (match) {
-              gainRetire += v.gainTotal ?? 0;
-              hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: f.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
-              return false;
-            }
-            return true;
+          const vendeurId = vends[idx].id;
+          const factureId = f.id;
+          const billNo = f.billNo;
+
+          const result = await updateVendeurAtomic(localId, vendeurId, (current) => {
+            let gainRetire = 0;
+            const historique = [...(current.historique ?? [])];
+            const ventes = (current.ventes ?? []).filter((v: VenteItem) => {
+              const match = v.factureId != null && v.factureId === factureId && v.billNo === billNo;
+              if (match) {
+                gainRetire += v.gainTotal ?? 0;
+                historique.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: f.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
+                return false;
+              }
+              return true;
+            });
+            return { ...current, ventes, historique, balance: Math.max(0, (current.balance ?? 0) - gainRetire) };
           });
-          vends[idx].historique = hist;
-          vends[idx].balance = Math.max(0, (vends[idx].balance ?? 0) - gainRetire);
-          await saveVendeur(vends[idx], localId);
+          if (result !== null) {
+            setVendeurs(prev => prev.map(v => v.id === vendeurId ? result : v));
+          } else {
+            let gainRetire = 0;
+            const hist = [...(vends[idx].historique ?? [])];
+            vends[idx].ventes = (vends[idx].ventes ?? []).filter((v: VenteItem) => {
+              const match = v.factureId != null && v.factureId === factureId && v.billNo === billNo;
+              if (match) {
+                gainRetire += v.gainTotal ?? 0;
+                hist.push(histEntry({ type: "annulation", montant: -(v.gainTotal ?? 0), description: "Vente annulée", venteId: v.id, marque: v.marque, modele: v.model, billNo: f.billNo, clientNom: v.clientNom, cashier: v.cashier, produitDescription: v.description }));
+                return false;
+              }
+              return true;
+            });
+            vends[idx].historique = hist;
+            vends[idx].balance = Math.max(0, (vends[idx].balance ?? 0) - gainRetire);
+            await saveVendeur(vends[idx], localId);
+          }
         }
       }
 
@@ -871,8 +981,9 @@ export default function FacturePage() {
           const vends = await loadVendeurs(localId);
           const idx = vends.findIndex(v => v.nom === f.vendeur);
           if (idx !== -1) {
-            const newVentes = [...(vends[idx].ventes ?? [])];
-            const hist = [...(vends[idx].historique ?? [])];
+            const vendeurId = vends[idx].id;
+            const nouvellesVentes: VenteItem[] = [];
+            const nouveauHist: HistEntry[] = [];
             let gainRemet = 0;
             for (const l of f.lignes) {
               const pvUSD = l.prix;
@@ -881,13 +992,24 @@ export default function FacturePage() {
               const gainKom = catKey ? commission[catKey] * l.qty : 0;
               gainRemet += benefis + gainKom;
               const ventId = `${Date.now()}_${l.productId}_${Math.random().toString(36).slice(2,7)}`;
-              newVentes.push({ ventId, factureId: f.id, id: l.productId, marque: l.marque, model: l.modele, categorie: l.category, prixAchat: l.prixAchat, prixVente: pvUSD, commission: gainKom, benefis, gainTotal: benefis + gainKom, qty: l.qty, billNo: f.billNo, date: new Date().toISOString(), clientNom: f.clientNom, cashier: f.cashier, description: l.description });
-              hist.push(histEntry({ type: "restauration", montant: benefis + gainKom, description: "Vente restaurée", venteId: l.productId, marque: l.marque, modele: l.modele, billNo: f.billNo, clientNom: f.clientNom, cashier: f.cashier, produitDescription: l.description }));
+              nouvellesVentes.push({ ventId, factureId: f.id, id: l.productId, marque: l.marque, model: l.modele, categorie: l.category, prixAchat: l.prixAchat, prixVente: pvUSD, commission: gainKom, benefis, gainTotal: benefis + gainKom, qty: l.qty, billNo: f.billNo, date: new Date().toISOString(), clientNom: f.clientNom, cashier: f.cashier, description: l.description });
+              nouveauHist.push(histEntry({ type: "restauration", montant: benefis + gainKom, description: "Vente restaurée", venteId: l.productId, marque: l.marque, modele: l.modele, billNo: f.billNo, clientNom: f.clientNom, cashier: f.cashier, produitDescription: l.description }));
             }
-            vends[idx].ventes = newVentes;
-            vends[idx].historique = hist;
-            vends[idx].balance = (vends[idx].balance ?? 0) + gainRemet;
-            await saveVendeur(vends[idx], localId);
+
+            const result = await updateVendeurAtomic(localId, vendeurId, (current) => ({
+              ...current,
+              ventes: [...(current.ventes ?? []), ...nouvellesVentes],
+              historique: [...(current.historique ?? []), ...nouveauHist],
+              balance: (current.balance ?? 0) + gainRemet,
+            }));
+            if (result !== null) {
+              setVendeurs(prev => prev.map(v => v.id === vendeurId ? result : v));
+            } else {
+              vends[idx].ventes = [...(vends[idx].ventes ?? []), ...nouvellesVentes];
+              vends[idx].historique = [...(vends[idx].historique ?? []), ...nouveauHist];
+              vends[idx].balance = (vends[idx].balance ?? 0) + gainRemet;
+              await saveVendeur(vends[idx], localId);
+            }
           }
         }
         updated.annule = false;
