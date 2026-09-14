@@ -4,31 +4,17 @@ import { useRouter } from "next/navigation";
 import { db, auth } from "../../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-
-// ══════════════════════════════════════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════════════════════════════════════
-async function verifyPassword(plain: string, stored: string, salt?: string): Promise<boolean> {
-  if (stored.length === 64) {
-    const sel = salt ?? "_millionstore_2024_sel";
-    const encoder = new TextEncoder();
-    const data = encoder.encode(plain + sel);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashed = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-    return hashed === stored;
-  }
-  return plain === stored;
-}
-
-async function hashPassword(plain: string, salt?: string): Promise<string> {
-  const sel = salt ?? "_millionstore_2024_sel";
-  const encoder = new TextEncoder();
-  const data = encoder.encode(plain + sel);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
+import {
+  generateSalt,
+  hashPassword,
+  verifyPassword,
+  passwordNeedsRehash,
+  hashSecurityAnswer,
+  verifySecurityAnswer,
+  upgradeSecurityQuestionsIfNeeded,
+  touchPresence,
+  provisionFirebaseIdentity,
+} from "../../lib/auth-utils";
 
 // ══════════════════════════════════════════════════════════════════════════
 // RESET PASSWORD MODAL
@@ -51,16 +37,31 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
     if (!username || !rep1 || !rep2 || !rep3) { setError("Veuillez remplir tous les champs."); return; }
     setLoading(true); setError("");
     try {
-      const snap = await getDoc(doc(db, "users", username.trim()));
+      const usernameTrim = username.trim();
+      const snap = await getDoc(doc(db, "users", usernameTrim));
       if (!snap.exists()) { setError("Utilisateur introuvable."); setLoading(false); return; }
       const data = snap.data();
       const q = data.securityQuestions;
+      const salt = data.salt as string | undefined;
       if (!q) { setError("Aucune question de sécurité pour ce compte."); setLoading(false); return; }
+
+      // ✅ Sipòte toulede fòma: repons hache (ak sèl) ak ansyen tèks klè
       const ok =
-        q.rep1?.toLowerCase().trim() === rep1.toLowerCase().trim() &&
-        q.rep2?.toLowerCase().trim() === rep2.toLowerCase().trim() &&
-        q.rep3?.toLowerCase().trim() === rep3.toLowerCase().trim();
+        (await verifySecurityAnswer(rep1, (q.rep1 ?? "").toString(), salt)) &&
+        (await verifySecurityAnswer(rep2, (q.rep2 ?? "").toString(), salt)) &&
+        (await verifySecurityAnswer(rep3, (q.rep3 ?? "").toString(), salt));
+
       if (!ok) { setError("Une ou plusieurs réponses sont incorrectes."); setLoading(false); return; }
+
+      // ✅ Si kont lan gen yon sèl deja (li deja migre pou modpas) men
+      // repons yo toujou tèks klè, hache yo kounye a menm.
+      if (salt) {
+        const upgraded = await upgradeSecurityQuestionsIfNeeded(salt, q);
+        if (upgraded) {
+          await updateDoc(doc(db, "users", usernameTrim), { securityQuestions: upgraded });
+        }
+      }
+
       setStep("newpass");
     } catch { setError("Erreur. Veuillez réessayer."); }
     setLoading(false);
@@ -71,9 +72,12 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
     if (newPass !== confirmPass) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true); setError("");
     try {
-      const hashed = await hashPassword(newPass);
+      // ✅ Nouvo sèl inik + hachaj — pa gen tèks klè ki ekri ankò
+      const newSalt = generateSalt();
+      const hashed  = await hashPassword(newPass, newSalt);
       await updateDoc(doc(db, "users", username.trim()), {
         password: hashed,
+        salt: newSalt,
         loginAttempts: 0,
         isBlocked: false,
       });
@@ -209,19 +213,25 @@ const [showConfirmPass, setShowConfirmPass] = useState(false);
     }
     setLoading(true);
     try {
-      const hashed = await hashPassword(password.trim());
+      // ✅ Chak itilizatè jwenn pwòp sèl li — modpas AK repons kesyon
+      // sekirite yo tout de hache ak menm sèl la, egzakteman menm fòma
+      // ak AuthService.dart nan Flutter la.
+      const salt   = generateSalt();
+      const hashed = await hashPassword(password.trim(), salt);
+
       const newUser = {
         username:    username.trim(),
         displayName: `${prenom.trim()} ${nom.trim()}`,
         password:    hashed,
+        salt,
         isAdmin:     false,
         isBlocked:   false,
         loginAttempts: 0,
         localId:     "all",
         securityQuestions: {
-          rep1: rep1.trim().toLowerCase(),
-          rep2: rep2.trim().toLowerCase(),
-          rep3: rep3.trim().toLowerCase(),
+          rep1: await hashSecurityAnswer(rep1, salt),
+          rep2: await hashSecurityAnswer(rep2, salt),
+          rep3: await hashSecurityAnswer(rep3, salt),
         },
         // Permissions par défaut — toutes à false
         factureVoir: false, factureCreye: false, factureModifye: false, factureSiprime: false, factureAnile: false, factureVoirIstwa: false,
@@ -397,21 +407,47 @@ export default function LoginPage() {
     if (!username.trim() || !password.trim()) { setError("Veuillez saisir votre nom d'utilisateur et votre mot de passe."); return; }
     setLoading(true); setError("");
     try {
-      const userDoc = await getDoc(doc(db, "users", username.trim()));
+      const usernameTrim = username.trim();
+      const userDoc = await getDoc(doc(db, "users", usernameTrim));
       if (!userDoc.exists()) { setError("Utilisateur introuvable."); setLoading(false); return; }
       const userData = userDoc.data();
       if (userData.isBlocked === true) { setError("Votre compte est bloqué. Contactez MillionStore."); setLoading(false); return; }
-      if (!await verifyPassword(password.trim(), userData.password ?? "", userData.salt)) {
+
+      const passOk = await verifyPassword(password.trim(), userData.password ?? "", userData.salt);
+      if (!passOk) {
         const attempts = (userData.loginAttempts ?? 0) + 1;
         const shouldBlock = attempts >= 5;
-        await setDoc(doc(db, "users", username.trim()), { loginAttempts: attempts, isBlocked: shouldBlock }, { merge: true });
+        await setDoc(doc(db, "users", usernameTrim), { loginAttempts: attempts, isBlocked: shouldBlock }, { merge: true });
         setError(shouldBlock ? "Votre compte est bloqué après 5 tentatives. Contactez MillionStore." : `Mot de passe incorrect. ${5 - attempts} tentative(s) restante(s).`);
         setLoading(false); return;
       }
-      await setDoc(doc(db, "users", username.trim()), { loginAttempts: 0, isBlocked: false }, { merge: true });
+
+      // ✅ Login reyisi — reset tantativ yo, epi migrasyon silans si sa nesesè
+      const updates: Record<string, unknown> = { loginAttempts: 0, isBlocked: false };
+
+      if (passwordNeedsRehash(userData.password ?? "", userData.salt)) {
+        const newSalt = generateSalt();
+        updates.password = await hashPassword(password.trim(), newSalt);
+        updates.salt = newSalt;
+
+        // Pwofite menm okazyon an pou hache kesyon sekirite yo tou,
+        // ak menm sèl ki fèk kreye a — egzakteman menm apwòch ak Flutter.
+        const upgradedQuestions = await upgradeSecurityQuestionsIfNeeded(
+          newSalt,
+          userData.securityQuestions
+        );
+        if (upgradedQuestions) {
+          updates.securityQuestions = upgradedQuestions;
+        }
+      }
+
+      await setDoc(doc(db, "users", usernameTrim), updates, { merge: true });
+      void touchPresence(usernameTrim);
+      void provisionFirebaseIdentity(usernameTrim, password.trim());
+
       const sessionUser = {
-        username:    userData.username ?? username.trim(),
-        displayName: userData.displayName ?? username.trim(),
+        username:    userData.username ?? usernameTrim,
+        displayName: userData.displayName ?? usernameTrim,
         isAdmin:     userData.isAdmin ?? false,
         localId:     userData.localId ?? "all",
         permissions: userData,

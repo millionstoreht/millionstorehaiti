@@ -4,6 +4,8 @@ import { Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+// ★★★ KOTE #1 — enpòte touchPresence ★★★
+import { touchPresence } from "../../lib/auth-utils";
 import {
   ShoppingCart, Package, Users, BarChart2, Printer, Settings,
   Badge, Truck, FileText, HardHat, LogOut, StickyNote, Info,
@@ -84,6 +86,19 @@ export default function DashboardPage() {
       });
     } catch { router.push("/login"); }
   }, [router]);
+
+  // ★★★ KOTE #2 — nouvo useEffect pou prezans lan ★★★
+  // Kòmanse touche prezans lan yon fwa lè itilizatè a fin chaje, epi chak
+  // 45 segonn pandan Dashboard la rete louvri. Netwayaj la (clearInterval)
+  // rive otomatikman lè paj la fèmen OSWA lè `user` chanje.
+  useEffect(() => {
+    if (!user) return;
+    touchPresence(user.username);
+    const interval = setInterval(() => {
+      touchPresence(user.username);
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem("ms_web_user");
