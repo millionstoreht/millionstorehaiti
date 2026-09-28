@@ -2,88 +2,44 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, auth } from "../../lib/firebase";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, getDoc, setDoc, writeBatch } from "firebase/firestore";
 import {
-  generateSalt,
-  hashPassword,
-  verifyPassword,
-  passwordNeedsRehash,
-  hashSecurityAnswer,
-  verifySecurityAnswer,
-  upgradeSecurityQuestionsIfNeeded,
-  touchPresence,
-  provisionFirebaseIdentity,
-} from "../../lib/auth-utils";
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  deleteUser,
+  signOut,
+} from "firebase/auth";
+import { touchPresence, DEFAULT_PERMISSIONS, DEFAULT_LOCAL_ID } from "../../lib/auth-utils";
 
 // ══════════════════════════════════════════════════════════════════════════
-// RESET PASSWORD MODAL
+// RESET PASSWORD MODAL — ✅ Firebase envoie directement un lien sécurisé
+// à la vraie adresse email. Plus de questions de sécurité, plus de code
+// personnalisé.
 // ══════════════════════════════════════════════════════════════════════════
 function ResetPasswordModal({ onClose }: { onClose: () => void }) {
-  const [step, setStep]               = useState<"questions" | "newpass">("questions");
-  const [username, setUsername]       = useState("");
-  const [rep1, setRep1]               = useState("");
-  const [rep2, setRep2]               = useState("");
-  const [rep3, setRep3]               = useState("");
-  const [newPass, setNewPass]         = useState("");
-  const [confirmPass, setConfirmPass] = useState("");
-  const [showNew, setShowNew]         = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
-  const [success, setSuccess]         = useState("");
+  const [email, setEmail]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
 
-  const verifyAnswers = async () => {
-    if (!username || !rep1 || !rep2 || !rep3) { setError("Veuillez remplir tous les champs."); return; }
-    setLoading(true); setError("");
+  const isValidEmail = (e: string) => /^[\w.\-+]+@[\w-]+\.[\w.-]+$/.test(e.trim());
+
+  const sendResetLink = async () => {
+    setError(""); setSuccess("");
+    const trimmed = email.trim();
+    if (!trimmed) { setError("Entrez votre adresse email."); return; }
+    if (!isValidEmail(trimmed)) { setError("Adresse email invalide."); return; }
+
+    setLoading(true);
     try {
-      const usernameTrim = username.trim();
-      const snap = await getDoc(doc(db, "users", usernameTrim));
-      if (!snap.exists()) { setError("Utilisateur introuvable."); setLoading(false); return; }
-      const data = snap.data();
-      const q = data.securityQuestions;
-      const salt = data.salt as string | undefined;
-      if (!q) { setError("Aucune question de sécurité pour ce compte."); setLoading(false); return; }
-
-      // ✅ Sipòte toulede fòma: repons hache (ak sèl) ak ansyen tèks klè
-      const ok =
-        (await verifySecurityAnswer(rep1, (q.rep1 ?? "").toString(), salt)) &&
-        (await verifySecurityAnswer(rep2, (q.rep2 ?? "").toString(), salt)) &&
-        (await verifySecurityAnswer(rep3, (q.rep3 ?? "").toString(), salt));
-
-      if (!ok) { setError("Une ou plusieurs réponses sont incorrectes."); setLoading(false); return; }
-
-      // ✅ Si kont lan gen yon sèl deja (li deja migre pou modpas) men
-      // repons yo toujou tèks klè, hache yo kounye a menm.
-      if (salt) {
-        const upgraded = await upgradeSecurityQuestionsIfNeeded(salt, q);
-        if (upgraded) {
-          await updateDoc(doc(db, "users", usernameTrim), { securityQuestions: upgraded });
-        }
-      }
-
-      setStep("newpass");
-    } catch { setError("Erreur. Veuillez réessayer."); }
-    setLoading(false);
-  };
-
-  const saveNewPassword = async () => {
-    if (newPass.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
-    if (newPass !== confirmPass) { setError("Les mots de passe ne correspondent pas."); return; }
-    setLoading(true); setError("");
-    try {
-      // ✅ Nouvo sèl inik + hachaj — pa gen tèks klè ki ekri ankò
-      const newSalt = generateSalt();
-      const hashed  = await hashPassword(newPass, newSalt);
-      await updateDoc(doc(db, "users", username.trim()), {
-        password: hashed,
-        salt: newSalt,
-        loginAttempts: 0,
-        isBlocked: false,
-      });
-      setSuccess("✅ Mot de passe changé avec succès !");
-      setTimeout(() => onClose(), 2000);
-    } catch { setError("Erreur. Veuillez réessayer."); }
+      await sendPasswordResetEmail(auth, trimmed);
+      setSuccess(`✅ Un lien de réinitialisation a été envoyé à ${trimmed}. Vérifiez votre boîte de réception (et vos spams).`);
+    } catch (e: any) {
+      setError(e?.code === "auth/user-not-found" ? "Aucun compte associé à cet email." : "Erreur. Veuillez réessayer.");
+    }
     setLoading(false);
   };
 
@@ -94,11 +50,9 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
         <div style={{ padding: "16px 18px 0" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <div>
-              <p style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: "#1a1a2e" }}>
-                {step === "questions" ? "🔐 Mot de passe oublié" : "🔒 Nouveau mot de passe"}
-              </p>
+              <p style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: "#1a1a2e" }}>🔐 Mot de passe oublié</p>
               <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#888" }}>
-                {step === "questions" ? "Répondez aux 3 questions de sécurité" : "Choisissez un nouveau mot de passe"}
+                Entrez votre email, nous vous enverrons un lien
               </p>
             </div>
             <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f1f1f1", border: "none", fontSize: "16px", cursor: "pointer" }}>×</button>
@@ -107,63 +61,14 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
           {error   && <div style={{ background: "#fff0f0", color: "#e63946", padding: "10px 12px", borderRadius: "10px", fontSize: "12px", marginBottom: "14px", textAlign: "center" }}>{error}</div>}
           {success && <div style={{ background: "#e8fdf0", color: "#1a9e6e", padding: "10px 12px", borderRadius: "10px", fontSize: "13px", marginBottom: "14px", textAlign: "center", fontWeight: 700 }}>{success}</div>}
 
-          {step === "questions" && (
-            <>
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>NOM D'UTILISATEUR</p>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="votre nom d'utilisateur..."
-                style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #e8e8e8", borderRadius: "12px", fontSize: "14px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box", marginBottom: "14px" }} />
+          <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>EMAIL</p>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="jean.pierre@gmail.com"
+            onKeyDown={(e) => e.key === "Enter" && sendResetLink()}
+            style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #e8e8e8", borderRadius: "12px", fontSize: "14px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box", marginBottom: "18px" }} />
 
-              {[
-                { label: "1️⃣ Nom de jeune fille de votre mère ?", val: rep1, set: setRep1 },
-                { label: "2️⃣ Dans quelle ville êtes-vous né(e) ?", val: rep2, set: setRep2 },
-                { label: "3️⃣ Quel est le nom de votre meilleur(e) ami(e) ?", val: rep3, set: setRep3 },
-              ].map(({ label, val, set }) => (
-                <div key={label} style={{ background: "#f8f9fa", borderRadius: "14px", padding: "14px", marginBottom: "10px" }}>
-                  <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, color: "#1a1a2e" }}>{label}</p>
-                  <input value={val} onChange={(e) => set(e.target.value)} placeholder="Votre réponse..."
-                    style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #e0e0e0", borderRadius: "10px", fontSize: "13px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box" }} />
-                </div>
-              ))}
-              <button onClick={verifyAnswers} disabled={loading} style={{ width: "100%", padding: "15px", background: loading ? "#888" : "#1a1a2e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: "6px" }}>
-                {loading ? "⏳ Vérification..." : "✅ Vérifier mes réponses"}
-              </button>
-            </>
-          )}
-
-          {step === "newpass" && (
-            <>
-              <div style={{ background: "#e8fdf0", borderRadius: "12px", padding: "12px", marginBottom: "16px", textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: "13px", color: "#1a9e6e", fontWeight: 700 }}>✅ Réponses correctes ! Entrez votre nouveau mot de passe.</p>
-              </div>
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>NOUVEAU MOT DE PASSE</p>
-              <div style={{ display: "flex", alignItems: "center", border: "1.5px solid #e8e8e8", borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "10px" }}>
-                <input type={showNew ? "text" : "password"} value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Min. 6 caractères"
-                  style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
-                <button type="button" onClick={() => setShowNew(!showNew)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>{showNew ? "🙈" : "👁️"}</button>
-              </div>
-              {newPass && (
-                <div style={{ marginBottom: "12px" }}>
-                  <div style={{ height: "4px", borderRadius: "999px", background: "#f0f0f0", overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: "999px", width: newPass.length >= 10 ? "100%" : newPass.length >= 6 ? "60%" : "25%", background: newPass.length >= 10 ? "#1a9e6e" : newPass.length >= 6 ? "#f79f1f" : "#e63946", transition: "width 0.3s" }} />
-                  </div>
-                  <p style={{ margin: "3px 0 0", fontSize: "10px", color: newPass.length >= 10 ? "#1a9e6e" : newPass.length >= 6 ? "#f79f1f" : "#e63946" }}>
-                    {newPass.length >= 10 ? "Fort 💪" : newPass.length >= 6 ? "Moyen" : "Trop court"}
-                  </p>
-                </div>
-              )}
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>CONFIRMER LE MOT DE PASSE</p>
-              <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${confirmPass && confirmPass !== newPass ? "#e63946" : "#e8e8e8"}`, borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px" }}>
-                <input type={showConfirm ? "text" : "password"} value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="Répétez le mot de passe"
-                  style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
-                <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>{showConfirm ? "🙈" : "👁️"}</button>
-              </div>
-              {confirmPass && confirmPass !== newPass && <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#e63946" }}>❌ Les mots de passe ne correspondent pas</p>}
-              {confirmPass && confirmPass === newPass && <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#1a9e6e" }}>✅ Les mots de passe correspondent</p>}
-              <button onClick={saveNewPassword} disabled={loading} style={{ width: "100%", padding: "15px", background: loading ? "#888" : "#1a9e6e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: "8px" }}>
-                {loading ? "⏳ Enregistrement..." : "💾 Changer le mot de passe"}
-              </button>
-            </>
-          )}
+          <button onClick={sendResetLink} disabled={loading} style={{ width: "100%", padding: "15px", background: loading ? "#888" : "#1a1a2e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            {loading ? "⏳ Envoi..." : "📩 Envoyer le lien de réinitialisation"}
+          </button>
         </div>
       </div>
     </div>
@@ -171,95 +76,93 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// REGISTER MODAL
+// REGISTER MODAL — ✅ Une seule étape, vrai email, aucune question de
+// sécurité. Firebase Auth gère le mot de passe réel directement.
 // ══════════════════════════════════════════════════════════════════════════
 function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [step, setStep]         = useState<"info" | "security">("info");
-  const [nom, setNom]                 = useState("");
-const [prenom, setPrenom]           = useState("");
-const [username, setUsername]       = useState("");
-const [password, setPassword]       = useState("");
-const [confirmPassword, setConfirmPassword] = useState("");
-const [showPass, setShowPass]       = useState(false);
-const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [rep1, setRep1]         = useState("");
-  const [rep2, setRep2]         = useState("");
-  const [rep3, setRep3]         = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
-  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [nomComplet, setNomComplet]           = useState("");
+  const [username, setUsername]               = useState("");
+  const [email, setEmail]                     = useState("");
+  const [telephone, setTelephone]             = useState("");
+  const [password, setPassword]               = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPass, setShowPass]               = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [loading, setLoading]                 = useState(false);
+  const [error, setError]                     = useState("");
 
-  const goToSecurity = async () => {
-    if (checkingUsername) return;
-    setCheckingUsername(true);
-    try {
-      if (!nom.trim() || !prenom.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
-        setError("Tous les champs sont obligatoires."); return;
-      }
-      if (password.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
-      if (password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return; }
-      // Vérifie si le username existe déjà
-      const snap = await getDoc(doc(db, "users", username.trim()));
-      if (snap.exists()) { setError("Ce nom d'utilisateur est déjà pris. Choisissez-en un autre."); return; }
-      setError(""); setStep("security");
-    } finally {
-      setCheckingUsername(false);
-    }
-  };
+  const isValidEmail = (e: string) => /^[\w.\-+]+@[\w-]+\.[\w.-]+$/.test(e.trim());
 
   const submit = async () => {
-    if (!rep1.trim() || !rep2.trim() || !rep3.trim()) {
-      setError("Répondez aux 3 questions de sécurité."); return;
+    setError("");
+    if (!nomComplet.trim() || !username.trim() || !email.trim() || !telephone.trim() || !password.trim()) {
+      setError("Tous les champs sont obligatoires."); return;
     }
+    if (!isValidEmail(email)) { setError("Adresse email invalide."); return; }
+    if (password.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return; }
+    if (password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return; }
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(username.trim())) {
+      setError("Nom d'utilisateur : 3 à 30 caractères (lettres, chiffres, . _ -), sans espace."); return;
+    }
+
     setLoading(true);
     try {
-      // ✅ Chak itilizatè jwenn pwòp sèl li — modpas AK repons kesyon
-      // sekirite yo tout de hache ak menm sèl la, egzakteman menm fòma
-      // ak AuthService.dart nan Flutter la.
-      const salt   = generateSalt();
-      const hashed = await hashPassword(password.trim(), salt);
+      const usernameTrim = username.trim();
+      const emailTrim    = email.trim();
+
+      // ✅ Verifye si non itilizatè a pran deja (yon sèl fich, pa tout lis la)
+      const usernameKey = usernameTrim.toLowerCase();
+      const takenSnap = await getDoc(doc(db, "usernames", usernameKey));
+      if (takenSnap.exists()) {
+        setError("Ce nom d'utilisateur est déjà pris. Choisissez-en un autre.");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Kreye kont Firebase Auth
+      let uid: string;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, emailTrim, password);
+        uid = cred.user.uid;
+      } catch (e: any) {
+        const msg =
+          e?.code === "auth/email-already-in-use" ? "Cette adresse email est déjà utilisée." :
+          e?.code === "auth/invalid-email"         ? "Adresse email invalide." :
+          e?.code === "auth/weak-password"         ? "Le mot de passe est trop faible." :
+          "Erreur lors de la création du compte.";
+        setError(msg);
+        setLoading(false);
+        return;
+      }
 
       const newUser = {
-        username:    username.trim(),
-        displayName: `${prenom.trim()} ${nom.trim()}`,
-        password:    hashed,
-        salt,
+        uid,
+        username:    usernameTrim,
+        email:       emailTrim,
+        displayName: nomComplet.trim(),
+        telephone:   telephone.trim(),
         isAdmin:     false,
         isBlocked:   false,
-        loginAttempts: 0,
-        localId:     "all",
-        securityQuestions: {
-          rep1: await hashSecurityAnswer(rep1, salt),
-          rep2: await hashSecurityAnswer(rep2, salt),
-          rep3: await hashSecurityAnswer(rep3, salt),
-        },
-        // Permissions par défaut — toutes à false
-        factureVoir: false, factureCreye: false, factureModifye: false, factureSiprime: false, factureAnile: false, factureVoirIstwa: false,
-        produitVoir: false, produitAjoute: false, produitModifye: false, produitSiprime: false, produitChangePrix: false,
-        clientVoir: false, clientAjoute: false, clientModifye: false, clientSiprime: false,
-        rapportVoir: true, rapportEksporte: false, rapportSiprime: false, rapportAnile: false,
-        imprimanteVoir: false, imprimanteAjoute: false, imprimanteModifye: false, imprimanteSiprime: false,
-        parametreVoir: true, parametreAcces: false, parametreModifye: false, parametreSiprime: false, parametreChanje: false,
-        vendeurVoir: true, vendeurAjoute: false, vendeurModifye: false, vendeurSiprime: false,
-        fournisseurVoir: false, fournisseurAjoute: false, fournisseurModifye: false, fournisseurSiprime: false,
-        ficheVoir: false, ficheAcces: false, ficheAjouteKliyan: false, ficheModifyeKliyan: false, ficheSiprimeKliyan: false,
-        ficheAjoutePwodwi: false, ficheModifyePwodwi: false, ficheSiprimePwodwi: false, ficheRapo: false, ficheIstwa: false,
-        workersVoir: false, workersAjoute: false, workersModifye: false, workersSiprime: false,
-        callingVoir: false, callingAjouteText: false, callingModifyeText: false, callingSiprimeText: false, callingFeApel: false, callingFeVideo: false,
-        cameraVoir: false, cameraAcces: false, cameraAjoute: false, cameraModifye: false, cameraSiprime: false,
-        utilisateurVoir: false, utilisateurAjoute: false, utilisateurModifye: false, utilisateurSiprime: false, utilisateurBloke: false, utilisateurDebloke: false,
-        noteVoir: true, noteAjoute: true, noteModifye: false, noteSiprime: false,
-        notepapVoir: true, notepapAjoute: true, notepapSiprime: false,
-        printerAcces: false,
-        createdAt: new Date().toISOString(),
+        localId:     DEFAULT_LOCAL_ID,
+        ...DEFAULT_PERMISSIONS,
+        createdAt:   new Date().toISOString(),
       };
 
-      // Sauvegarde dans users/{username}
-      await setDoc(doc(db, "users", username.trim()), newUser);
+      try {
+        const batch = writeBatch(db);
+        batch.set(doc(db, "users", uid), newUser);
+        batch.set(doc(db, "usernames", usernameKey), { uid });
+        await batch.commit();
+      } catch (e) {
+        // Si Firestore echwe, efase kont Auth la pou pa kite l trennen
+        try { if (auth.currentUser) await deleteUser(auth.currentUser); } catch {}
+        throw e;
+      }
+
       onSuccess();
       onClose();
     } catch (e: any) {
-      setError("Erreur. Veuillez réessayer.");
+      setError("Erreur : " + (e?.message ?? e));
     }
     setLoading(false);
   };
@@ -269,119 +172,64 @@ const [showConfirmPass, setShowConfirmPass] = useState(false);
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: "480px", maxHeight: "93vh", overflowY: "auto", paddingBottom: "40px" }}>
         <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "12px auto 0" }} />
 
-        {/* Progress */}
-        <div style={{ display: "flex", gap: "6px", padding: "12px 18px 0" }}>
-          {["info", "security"].map((s, i) => (
-            <div key={s} style={{ flex: 1, height: "4px", borderRadius: "2px", background: i === 0 || step === "security" ? "#1a1a2e" : "#e0e0e0" }} />
-          ))}
-        </div>
-
         <div style={{ padding: "14px 18px 0" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: "#1a1a2e" }}>
-                {step === "info" ? "🆕 Créer un compte" : "🔐 Questions de sécurité"}
-              </h3>
-              <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#888" }}>
-                {step === "info" ? "Étape 1/2 — Vos informations" : "Étape 2/2 — Pour votre sécurité"}
-              </p>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: "#1a1a2e" }}>🆕 Créer un compte</h3>
+              <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#888" }}>Vos informations</p>
             </div>
             <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#f1f1f1", border: "none", fontSize: "16px", cursor: "pointer" }}>×</button>
           </div>
 
           {error && <div style={{ background: "#fff0f0", color: "#e63946", padding: "10px 12px", borderRadius: "10px", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>{error}</div>}
 
-          {step === "info" && (
-            <>
-              {[
-                { label: "NOM *", val: nom, set: setNom, ph: "Nom", type: "text" },
-                { label: "PRÉNOM *", val: prenom, set: setPrenom, ph: "Prénom", type: "text" },
-                { label: "NOM D'UTILISATEUR *", val: username, set: setUsername, ph: "Username", type: "text" },
-              ].map(({ label, val, set, ph, type }) => (
-                <div key={label} style={{ marginBottom: "12px" }}>
-                  <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>{label}</p>
-                  <input type={type} value={val} onChange={(e) => set(e.target.value)} placeholder={ph}
-                    style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #e8e8e8", borderRadius: "12px", fontSize: "14px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box", background: "#f8f8f8" }} />
-                </div>
-              ))}
+          {[
+            { label: "NOM COMPLET *", val: nomComplet, set: setNomComplet, ph: "Jean Pierre", type: "text" },
+            { label: "NOM D'UTILISATEUR *", val: username, set: setUsername, ph: "Username", type: "text" },
+            { label: "EMAIL *", val: email, set: setEmail, ph: "jean.pierre@gmail.com", type: "email" },
+            { label: "TÉLÉPHONE (WHATSAPP) *", val: telephone, set: setTelephone, ph: "+509 1234 5678", type: "tel" },
+          ].map(({ label, val, set, ph, type }) => (
+            <div key={label} style={{ marginBottom: "12px" }}>
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>{label}</p>
+              <input type={type} value={val} onChange={(e) => set(e.target.value)} placeholder={ph}
+                style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #e8e8e8", borderRadius: "12px", fontSize: "14px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box", background: "#f8f8f8" }} />
+            </div>
+          ))}
 
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>MOT DE PASSE * (min. 6)</p>
-              <div style={{ display: "flex", alignItems: "center", border: "1.5px solid #e8e8e8", borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px", background: "#f8f8f8" }}>
-                <input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
-                  style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
-                <button type="button" onClick={() => setShowPass(!showPass)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>
-                  {showPass ? "🙈" : "👁️"}
-                </button>
-              </div>
-              {password && (
-                <div style={{ marginBottom: "12px" }}>
-                  <div style={{ height: "4px", borderRadius: "999px", background: "#f0f0f0", overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: "999px", width: password.length >= 10 ? "100%" : password.length >= 6 ? "60%" : "25%", background: password.length >= 10 ? "#1a9e6e" : password.length >= 6 ? "#f79f1f" : "#e63946", transition: "width 0.3s" }} />
-                  </div>
-                  <p style={{ margin: "3px 0 0", fontSize: "10px", color: password.length >= 10 ? "#1a9e6e" : password.length >= 6 ? "#f79f1f" : "#e63946" }}>
-                    {password.length >= 10 ? "Fort 💪" : password.length >= 6 ? "Moyen" : "Trop court"}
-                  </p>
-                </div>
-              )}
+          <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>MOT DE PASSE * (min. 6)</p>
+          <div style={{ display: "flex", alignItems: "center", border: "1.5px solid #e8e8e8", borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px", background: "#f8f8f8" }}>
+            <input type={showPass ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
+              style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
+            <button type="button" onClick={() => setShowPass(!showPass)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>
+              {showPass ? "🙈" : "👁️"}
+            </button>
+          </div>
 
-              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>CONFIRMER LE MOT DE PASSE *</p>
-              <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${confirmPassword && confirmPassword !== password ? "#e63946" : "#e8e8e8"}`, borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px", background: "#f8f8f8" }}>
-                <input type={showConfirmPass ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••"
-                  style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
-                <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>
-                  {showConfirmPass ? "🙈" : "👁️"}
-                </button>
-              </div>
-              {confirmPassword && confirmPassword !== password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#e63946" }}>❌ Les mots de passe ne correspondent pas</p>}
-              {confirmPassword && confirmPassword === password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#1a9e6e" }}>✅ Les mots de passe correspondent</p>}
+          <p style={{ margin: "12px 0 5px", fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>CONFIRMER LE MOT DE PASSE *</p>
+          <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${confirmPassword && confirmPassword !== password ? "#e63946" : "#e8e8e8"}`, borderRadius: "12px", padding: "11px 14px", gap: "10px", marginBottom: "6px", background: "#f8f8f8" }}>
+            <input type={showConfirmPass ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••"
+              style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", fontFamily: "inherit", color: "#333", background: "transparent" }} />
+            <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "15px", padding: 0 }}>
+              {showConfirmPass ? "🙈" : "👁️"}
+            </button>
+          </div>
+          {confirmPassword && confirmPassword !== password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#e63946" }}>❌ Les mots de passe ne correspondent pas</p>}
+          {confirmPassword && confirmPassword === password && <p style={{ margin: "0 0 14px", fontSize: "11px", color: "#1a9e6e" }}>✅ Les mots de passe correspondent</p>}
 
-              <button 
-                onClick={goToSecurity} 
-                disabled={checkingUsername}
-                style={{ 
-                  width: "100%", padding: "14px", 
-                  background: checkingUsername ? "#888" : "#1a1a2e", 
-                  color: "#fff", border: "none", borderRadius: "14px", 
-                  fontSize: "14px", fontWeight: 800, 
-                  cursor: checkingUsername ? "not-allowed" : "pointer", 
-                  fontFamily: "inherit" 
-                }}
-              >
-                {checkingUsername ? "⏳ Vérification..." : "Suivant → Questions de sécurité"}
-              </button>
-            </>
-          )}
-
-          {step === "security" && (
-            <>
-              <div style={{ background: "#f0f4ff", borderRadius: "12px", padding: "10px 12px", marginBottom: "14px" }}>
-                <p style={{ margin: 0, fontSize: "12px", color: "#3b4dd4" }}>
-                  ℹ️ Ces réponses serviront à récupérer votre mot de passe si vous l'oubliez. Mémorisez-les bien !
-                </p>
-              </div>
-
-              {[
-                { label: "1️⃣ Nom de jeune fille de votre mère ?", val: rep1, set: setRep1 },
-                { label: "2️⃣ Dans quelle ville êtes-vous né(e) ?", val: rep2, set: setRep2 },
-                { label: "3️⃣ Quel est le nom de votre meilleur(e) ami(e) ?", val: rep3, set: setRep3 },
-              ].map(({ label, val, set }) => (
-                <div key={label} style={{ background: "#f8f9fa", borderRadius: "14px", padding: "12px 14px", marginBottom: "10px" }}>
-                  <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 700, color: "#1a1a2e" }}>{label}</p>
-                  <input value={val} onChange={(e) => set(e.target.value)} placeholder="Votre réponse..."
-                    style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #e0e0e0", borderRadius: "10px", fontSize: "13px", outline: "none", fontFamily: "inherit", color: "#333", boxSizing: "border-box" }} />
-                </div>
-              ))}
-
-              <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                <button onClick={() => { setStep("info"); setError(""); }} style={{ flex: 1, padding: "14px", background: "#f0f0f0", color: "#333", border: "none", borderRadius: "14px", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  ← Retour
-                </button>
-                <button onClick={submit} disabled={loading} style={{ flex: 2, padding: "14px", background: loading ? "#888" : "#1a9e6e", color: "#fff", border: "none", borderRadius: "14px", fontSize: "14px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                  {loading ? "⏳ Création..." : "✅ Créer mon compte"}
-                </button>
-              </div>
-            </>
-          )}
+          <button
+            onClick={submit}
+            disabled={loading}
+            style={{
+              width: "100%", padding: "14px",
+              background: loading ? "#888" : "#1a9e6e",
+              color: "#fff", border: "none", borderRadius: "14px",
+              fontSize: "14px", fontWeight: 800,
+              cursor: loading ? "not-allowed" : "pointer",
+              fontFamily: "inherit", marginTop: "12px"
+            }}
+          >
+            {loading ? "⏳ Création..." : "✅ Créer mon compte"}
+          </button>
         </div>
       </div>
     </div>
@@ -389,11 +237,11 @@ const [showConfirmPass, setShowConfirmPass] = useState(false);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// LOGIN PAGE
+// LOGIN PAGE — ✅ Email + mot de passe réel, directement via Firebase Auth
 // ══════════════════════════════════════════════════════════════════════════
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername]         = useState("");
+  const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPass, setShowPass]         = useState(false);
   const [loading, setLoading]           = useState(false);
@@ -404,50 +252,48 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg]     = useState("");
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) { setError("Veuillez saisir votre nom d'utilisateur et votre mot de passe."); return; }
+    if (!email.trim() || !password.trim()) { setError("Veuillez saisir votre email et votre mot de passe."); return; }
     setLoading(true); setError("");
     try {
-      const usernameTrim = username.trim();
-      const userDoc = await getDoc(doc(db, "users", usernameTrim));
-      if (!userDoc.exists()) { setError("Utilisateur introuvable."); setLoading(false); return; }
+      const emailTrim = email.trim();
+
+      let uid: string;
+      try {
+        const cred = await signInWithEmailAndPassword(auth, emailTrim, password);
+        uid = cred.user.uid;
+      } catch (e: any) {
+        const msg =
+          e?.code === "auth/user-not-found" || e?.code === "auth/invalid-credential" || e?.code === "auth/wrong-password"
+            ? "Email ou mot de passe incorrect."
+          : e?.code === "auth/too-many-requests" ? "Trop de tentatives. Réessayez dans quelques minutes."
+          : e?.code === "auth/invalid-email" ? "Adresse email invalide."
+          : "Erreur de connexion.";
+        setError(msg);
+        setLoading(false);
+        return;
+      }
+
+      const userDoc = await getDoc(doc(db, "users", uid));
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        setError("Compte introuvable. Contactez MillionStore.");
+        setLoading(false);
+        return;
+      }
       const userData = userDoc.data();
-      if (userData.isBlocked === true) { setError("Votre compte est bloqué. Contactez MillionStore."); setLoading(false); return; }
-
-      const passOk = await verifyPassword(password.trim(), userData.password ?? "", userData.salt);
-      if (!passOk) {
-        const attempts = (userData.loginAttempts ?? 0) + 1;
-        const shouldBlock = attempts >= 5;
-        await setDoc(doc(db, "users", usernameTrim), { loginAttempts: attempts, isBlocked: shouldBlock }, { merge: true });
-        setError(shouldBlock ? "Votre compte est bloqué après 5 tentatives. Contactez MillionStore." : `Mot de passe incorrect. ${5 - attempts} tentative(s) restante(s).`);
-        setLoading(false); return;
+      if (userData.isBlocked === true) {
+        await signOut(auth);
+        setError("Votre compte est bloqué. Contactez MillionStore.");
+        setLoading(false);
+        return;
       }
 
-      // ✅ Login reyisi — reset tantativ yo, epi migrasyon silans si sa nesesè
-      const updates: Record<string, unknown> = { loginAttempts: 0, isBlocked: false };
-
-      if (passwordNeedsRehash(userData.password ?? "", userData.salt)) {
-        const newSalt = generateSalt();
-        updates.password = await hashPassword(password.trim(), newSalt);
-        updates.salt = newSalt;
-
-        // Pwofite menm okazyon an pou hache kesyon sekirite yo tou,
-        // ak menm sèl ki fèk kreye a — egzakteman menm apwòch ak Flutter.
-        const upgradedQuestions = await upgradeSecurityQuestionsIfNeeded(
-          newSalt,
-          userData.securityQuestions
-        );
-        if (upgradedQuestions) {
-          updates.securityQuestions = upgradedQuestions;
-        }
-      }
-
-      await setDoc(doc(db, "users", usernameTrim), updates, { merge: true });
-      void touchPresence(usernameTrim);
-      void provisionFirebaseIdentity(usernameTrim, password.trim());
+      void touchPresence(uid);
 
       const sessionUser = {
-        username:    userData.username ?? usernameTrim,
-        displayName: userData.displayName ?? usernameTrim,
+        uid,
+        username:    userData.username ?? emailTrim,
+        displayName: userData.displayName ?? emailTrim,
         isAdmin:     userData.isAdmin ?? false,
         localId:     userData.localId ?? "all",
         permissions: userData,
@@ -516,8 +362,8 @@ export default function LoginPage() {
         {/* Staff Login */}
 
         <div style={{ position: "relative", marginBottom: "12px" }}>
-          <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>👤</span>
-          <input type="text" placeholder="Nom d'utilisateur" value={username} onChange={(e) => setUsername(e.target.value)}
+          <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>📧</span>
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
             style={{ width: "100%", padding: "13px 14px 13px 44px", borderRadius: "12px", border: "1.5px solid #eee", fontSize: "15px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
             onFocus={(e) => e.target.style.borderColor = "#1a1a2e"} onBlur={(e) => e.target.style.borderColor = "#eee"} />
         </div>

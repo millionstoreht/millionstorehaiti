@@ -1,148 +1,62 @@
 // ══════════════════════════════════════════════════════════════════════════
 // auth-utils.ts
-// Fonksyon hachaj pataje pou tout paj (login, register, reset).
-// ⚠️ IMPÒTAN: menm eskèm egzat ak Flutter AuthService (sha256(valè + sèl)),
-// pou yon kont kreye sou web la ka konekte sou Flutter, e vis vèsa.
+// ✅ Firebase Auth (email + mot de passe réel) gère l'authentification et
+// la réinitialisation de mot de passe directement — aucun hachage ni
+// dérivation personnalisée n'est nécessaire ici. La seule chose partagée
+// entre les pages reste la présence (« en ligne » / « hors ligne »).
 // ══════════════════════════════════════════════════════════════════════════
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
 } from "firebase/auth";
 import { db, auth } from "./firebase";
 
-/** ⚠️ Sèl legacy — sèvi SÈLMAN pou verifye ansyen kont. Pa janm itilize l
- *  pou kreye oswa chanje yon modpas nouvo. */
-export const LEGACY_SALT = "_millionstore_2024_sel";
-
-async function sha256Hex(input: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Jenere yon sèl inik, kriptografikman solid, pou chak itilizatè. */
-export function generateSalt(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  let binary = "";
-  bytes.forEach((b) => (binary += String.fromCharCode(b)));
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-/** Hache yon modpas ak yon sèl OBLIGATWA. */
-export async function hashPassword(password: string, salt: string): Promise<string> {
-  return sha256Hex(password + salt);
-}
-
-/** Verifye yon modpas kont valè ki estoke a — sipòte sèl pwòp itilizatè a,
- *  ansyen sèl global la (konpatibilite), ak ansyen tèks klè. */
-export async function verifyPassword(
-  plain: string,
-  stored: string,
-  salt?: string
-): Promise<boolean> {
-  if (stored.length === 64) {
-    if (salt && (await hashPassword(plain, salt)) === stored) return true;
-    return (await hashPassword(plain, LEGACY_SALT)) === stored;
+/** ✅ Change le mot de passe de l'utilisateur connecté. Firebase exige une
+ *  ré-authentification récente pour cette opération sensible — on la fait
+ *  avec l'ancien mot de passe avant de passer au nouveau. */
+export async function changeOwnPassword(
+  oldPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; message?: string }> {
+  const user = auth.currentUser;
+  if (!user || !user.email) {
+    return { success: false, message: "Aucune session active." };
   }
-  return plain === stored;
-}
-
-/** Tcheke si yon modpas estoke bezwen rehachaj (migrasyon sekirite). */
-export function passwordNeedsRehash(stored: string, salt?: string): boolean {
-  if (stored.length !== 64) return true; // tèks klè
-  if (!salt) return true; // ansyen sèl global
-  return false;
-}
-
-/** Hache yon repons kesyon sekirite (normalize: retire espas, miniskil)
- *  ak sèl itilizatè a. */
-export async function hashSecurityAnswer(answer: string, salt: string): Promise<string> {
-  const normalized = answer.trim().toLowerCase();
-  return sha256Hex(normalized + salt);
-}
-
-/** Verifye yon repons kesyon sekirite — sipòte repons hache (ak sèl) ak
- *  ansyen repons tèks klè. */
-export async function verifySecurityAnswer(
-  plain: string,
-  stored: string,
-  salt?: string
-): Promise<boolean> {
-  const normalized = plain.trim().toLowerCase();
-  if (stored.length === 64 && salt) {
-    if ((await hashSecurityAnswer(plain, salt)) === stored) return true;
-  }
-  return stored === normalized;
-}
-
-/** Si repons kesyon sekirite yo toujou tèks klè, retounen yon vèsyon hache
- *  ak nouvo sèl la. Retounen null si pa gen chanjman pou fè. */
-export async function upgradeSecurityQuestionsIfNeeded(
-  salt: string,
-  questions: Record<string, unknown> | undefined | null
-): Promise<Record<string, string> | null> {
-  if (!questions || !salt) return null;
-  let changed = false;
-  const updated: Record<string, string> = {};
-  for (const key of ["rep1", "rep2", "rep3"] as const) {
-    const val = (questions[key] ?? "").toString();
-    if (val && val.length !== 64) {
-      updated[key] = await hashSecurityAnswer(val, salt);
-      changed = true;
-    } else {
-      updated[key] = val;
-    }
-  }
-  return changed ? updated : null;
-}
-
-/** Rele fonksyon sa a chak fwa yon login (Firestore) reyisi. Li kreye/
- *  konekte an silans yon kont Firebase Auth pou itilizatè a
- *  ({username}@millionstore.com) — pa modpas reyèl la ki sèvi kòm modpas
- *  Auth, men yon valè derive ki depann sèlman sou modpas la (pa sou sèl
- *  Firestore aktyèl la), pou l rete estab pandan migrasyon an.
- *  ⚠️ Menm lojik egzat ak AuthService.provisionFirebaseIdentity nan Flutter. */
-export async function provisionFirebaseIdentity(
-  username: string,
-  password: string
-): Promise<void> {
-  const email = `${username}@millionstore.com`;
-  const derivedPassword = (await hashPassword(password, LEGACY_SALT)).substring(0, 20);
   try {
-    await signInWithEmailAndPassword(auth, email, derivedPassword);
-  } catch (e: any) {
-    if (e?.code === "auth/user-not-found" || e?.code === "auth/invalid-credential") {
-      try {
-        await createUserWithEmailAndPassword(auth, email, derivedPassword);
-      } catch {
-        // Silans — pwovizyon se yon etap tranzisyon, pa yon bagay ki dwe
-        // bloke login aktyèl la.
+    const cred = EmailAuthProvider.credential(user.email, oldPassword);
+    try {
+      await reauthenticateWithCredential(user, cred);
+    } catch (e: any) {
+      if (e?.code === "auth/wrong-password" || e?.code === "auth/invalid-credential") {
+        return { success: false, message: "L'ancien mot de passe est incorrect." };
       }
+      return { success: false, message: "Erreur de vérification. Réessayez." };
     }
+    await updatePassword(user, newPassword);
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e?.message ?? "Erreur. Veuillez réessayer." };
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// PREZANS — "sou liy" / "pa sou liy" (menm lojik ak AuthService.dart)
+// PRÉSENCE — « en ligne » / « hors ligne » (même logique que AuthService.dart)
 // ══════════════════════════════════════════════════════════════════════════
 
-/** Konbyen tan san aktivite anvan nou konsidere yon itilizatè "pa sou liy".
- *  ⚠️ Dwe rete menm valè ak `AuthService.onlineThreshold` nan Flutter la. */
-export const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 minit
+/** Durée d'inactivité au-delà de laquelle un utilisateur est considéré
+ *  "hors ligne". */
+export const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
 
-/** Rele fonksyon sa a regilyèman (pa egzanp chak 45 segonn) pandan
- *  itilizatè a gen Dashboard web la louvri, pou estati "sou liy" la rete
- *  kòrèk pou moun k ap itilize sit la (pa sèlman Flutter la). */
-export async function touchPresence(username: string): Promise<void> {
-  if (!username) return;
+/** À appeler régulièrement (par ex. toutes les 45 secondes) pendant qu'un
+ *  utilisateur a le Dashboard web ouvert, pour que son statut "en ligne"
+ *  reste correct — y compris pour les utilisateurs connectés via Flutter. */
+export async function touchPresence(uid: string): Promise<void> {
+  if (!uid) return;
   try {
-    const ref  = doc(db, "users", username);
-    const now  = new Date();
+    const ref = doc(db, "users", uid);
+    const now = new Date();
     const snap = await getDoc(ref);
     const data = snap.exists() ? snap.data() : null;
     const lastSeenStr = data?.lastSeen as string | undefined;
@@ -155,6 +69,37 @@ export async function touchPresence(username: string): Promise<void> {
     }
     await updateDoc(ref, update);
   } catch {
-    // Silans — prezans se yon amelyorasyon, pa yon bagay ki dwe kraze UI a
+    // Silence — la présence est une amélioration, pas quelque chose qui
+    // doit bloquer l'interface.
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// PÈMISYON DEFO POU NOUVO KONT — menm valè ak UserPermissions.defaultPerms() Flutter
+// ══════════════════════════════════════════════════════════════════════════
+export const DEFAULT_LOCAL_ID = "1773629612385";
+
+export const DEFAULT_PERMISSIONS: Record<string, boolean> = {
+  produitVoir: false, produitAjoute: false, produitModifye: false, produitSiprime: false, produitChangePrix: false, produitVoirStockVid: false,
+  commandeVoir: false, commandeConfirme: false, commandeLivraison: false, commandeLivre: false, commandeAnile: false, commandeSiprime: false,
+  studioVoir: false,
+  factureVoir: false, factureCreye: false, factureVoirIstwa: false, factureAnile: false, factureSiprime: false, factureModifye: false,
+  clientVoir: false, clientAjoute: false, clientModifye: false, clientSiprime: false,
+  rapportVoir: false, rapportEksporte: false, rapportAnile: false, rapportSiprime: false,
+  utilisateurVoir: false, utilisateurAjoute: false, utilisateurModifye: false, utilisateurSiprime: false, utilisateurBloke: false, utilisateurDebloke: false,
+  localVoir: false, localAjoute: false, localModifye: false, localSiprime: false,
+  workersVoir: false, workersAjoute: false, workersModifye: false, workersSiprime: false,
+  fournisseurVoir: false, fournisseurAjoute: false, fournisseurModifye: false, fournisseurSiprime: false,
+  ficheVoir: false, ficheRapo: false, ficheIstwa: false, ficheAjouteKliyan: false, ficheModifyeKliyan: false, ficheSiprimeKliyan: false,
+  ficheAjoutePwodwi: false, ficheModifyePwodwi: false, ficheSiprimePwodwi: false,
+  cameraVoir: false, cameraAjoute: false, cameraModifye: false, cameraSiprime: false,
+  noteVoir: true, noteAjoute: true, noteModifye: false, noteSiprime: false,
+  imprimanteVoir: false, imprimanteAjoute: false, imprimanteModifye: false, imprimanteSiprime: false,
+  callingVoir: false, callingAjouteText: false, callingSiprimeText: false, callingModifyeText: false, callingFeApel: false, callingFeVideo: false,
+  vendeurVoir: true, vendeurAjoute: false, vendeurModifye: false, vendeurSiprime: false,
+  parametreVoir: true, parametreModifye: false, parametreChanje: false, parametreSiprime: false,
+  bracVoir: false, bracAjoute: false, bracModifye: false, bracSiprime: false, bracVoirRapport: false, bracVoirIstwa: false,
+  techVoir: false, techAjoute: false, techModifye: false, techSiprime: false,
+  notepapVoir: true, notepapAjoute: true, notepapSiprime: false,
+  printerAcces: false, parametreAcces: false, ficheAcces: false, cameraAcces: false,
+};

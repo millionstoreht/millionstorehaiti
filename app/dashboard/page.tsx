@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { db } from "../../lib/firebase";
+import { db, auth } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 // ★★★ KOTE #1 — enpòte touchPresence ★★★
 import { touchPresence } from "../../lib/auth-utils";
 import {
@@ -15,6 +16,7 @@ import {
 // TYPES
 // ══════════════════════════════════════════════════════════════════════════
 interface UserSession {
+  uid:         string;
   username:    string;
   displayName: string;
   isAdmin:     boolean;
@@ -65,7 +67,12 @@ export default function DashboardPage() {
     if (!raw) { router.push("/login"); return; }
     try {
       const session = JSON.parse(raw) as UserSession;
-      getDoc(doc(db, "users", session.username)).then((snap) => {
+      if (!session.uid) {
+        // ✅ Ancienne session (avant la restructuration par UID) — plus
+        // valide, forcer une reconnexion.
+        localStorage.removeItem("ms_web_user"); router.push("/login"); return;
+      }
+      getDoc(doc(db, "users", session.uid)).then((snap) => {
         if (!snap.exists()) {
           localStorage.removeItem("ms_web_user"); router.push("/login"); return;
         }
@@ -74,6 +81,7 @@ export default function DashboardPage() {
           localStorage.removeItem("ms_web_user"); router.push("/login"); return;
         }
         const updated: UserSession = {
+          uid:         session.uid,
           username:    data.username    ?? session.username,
           displayName: data.displayName ?? session.username,
           isAdmin:     data.isAdmin     ?? false,
@@ -93,15 +101,16 @@ export default function DashboardPage() {
   // rive otomatikman lè paj la fèmen OSWA lè `user` chanje.
   useEffect(() => {
     if (!user) return;
-    touchPresence(user.username);
+    touchPresence(user.uid);
     const interval = setInterval(() => {
-      touchPresence(user.username);
+      touchPresence(user.uid);
     }, 45000);
     return () => clearInterval(interval);
   }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem("ms_web_user");
+    signOut(auth).catch(() => {});
     router.push("/login");
   };
 
