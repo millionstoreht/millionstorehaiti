@@ -9,8 +9,9 @@ import { signOut } from "firebase/auth";
 import { touchPresence } from "../../lib/auth-utils";
 import {
   ShoppingCart, Package, Users, BarChart2, Printer, Settings,
-  Badge, Truck, FileText, HardHat, LogOut, StickyNote, Info,
+  Badge, Truck, FileText, HardHat, LogOut, StickyNote, Info, Calculator, CalendarDays,
 } from "lucide-react";
+import BestSellerBanner from "../../lib/BestSellerBanner";
 
 // ══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -52,6 +53,8 @@ const MENU_ITEMS: MenuItem[] = [
   { key: "site-settings", label: "Paramètres du site", icon: <Globe size={52} />,    color: "#e63946", href: "/dashboard/site-settings", adminOnly: true            },
   { key: "commandes",     label: "Commandes",      icon: <ShoppingCart size={52} />, color: "#FF5722", href: "/dashboard/commandes",     adminOnly: true            },
   { key: "information",   label: "Informations",   icon: <Info size={52} />,         color: "#1565C0", href: "/dashboard/information" },
+  { key: "calculatrice",  label: "Calculatrice",   icon: <Calculator size={52} />,   color: "#FF6B35", href: "/dashboard/calculatrice" },
+  { key: "calendrier", label: "Calendrier", icon: <CalendarDays size={52} />, color: "#4A3AA7", href: "/dashboard/calendrier" },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -117,6 +120,13 @@ export default function DashboardPage() {
   const canSee = (item: MenuItem): boolean => {
     if (!user) return false;
     if (user.isAdmin) return true;
+
+    if (item.key === "calendrier") {
+      return ["factureVoir", "factureVoirIstwa", "vendeurVoir", "fournisseurVoir", "commandeVoir"]
+        .some(k => user.permissions[k] === true);
+    }
+
+
     if (item.adminOnly) return false;
     if (item.permKey) return user.permissions[item.permKey] === true;
     return true;
@@ -195,6 +205,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Grille du menu (style Flutter : carte blanche, icône colorée directe) ── */}
+        {user && <BestSellerBanner localId={user.localId} compact />}
         {visibleItems.length === 0 ? (
           <div style={{ background: "#fff", borderRadius: "20px", padding: "60px", textAlign: "center", border: "1px solid #eee" }}>
             <p style={{ fontSize: "48px", margin: "0 0 12px" }}>🔒</p>
