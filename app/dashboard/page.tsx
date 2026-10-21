@@ -8,8 +8,8 @@ import { signOut } from "firebase/auth";
 // ★★★ KOTE #1 — enpòte touchPresence ★★★
 import { touchPresence } from "../../lib/auth-utils";
 import {
-  ShoppingCart, Package, Users, BarChart2, Printer, Settings,
-  Badge, Truck, FileText, HardHat, LogOut, StickyNote, Info, Calculator, CalendarDays,
+  ShoppingCart, BarChart2, Settings,
+  Badge, Truck, HardHat, LogOut, StickyNote, Info, Calculator, CalendarDays,
 } from "lucide-react";
 import BestSellerBanner from "../../lib/BestSellerBanner";
 
@@ -39,15 +39,13 @@ interface MenuItem {
 // MENU ITEMS
 // ══════════════════════════════════════════════════════════════════════════
 const MENU_ITEMS: MenuItem[] = [
-  { key: "factures",      label: "Facturation",   icon: <ShoppingCart size={52} />, color: "#2196F3", href: "/dashboard/factures",      permKey: "factureVoir"     },
-  { key: "produits",      label: "Produits",       icon: <Package size={52} />,      color: "#FF9800", href: "/dashboard/produits",      permKey: "produitVoir"     },
-  { key: "clients",       label: "Clients",        icon: <Users size={52} />,        color: "#4CAF50", href: "/dashboard/clients",       permKey: "clientVoir"      },
+  
   { key: "rapports",      label: "Rapports",       icon: <BarChart2 size={52} />,    color: "#F44336", href: "/dashboard/rapports",      permKey: "rapportVoir"     },
-  { key: "imprimante",    label: "Imprimante",     icon: <Printer size={52} />,      color: "#9C27B0", href: "/dashboard/imprimante",    permKey: "imprimanteVoir"  },
+  
   { key: "parametres",    label: "Paramètres",     icon: <Settings size={52} />,     color: "#9E9E9E", href: "/dashboard/parametres",    permKey: "parametreVoir"   },
   { key: "vendeurs",      label: "Vendeurs",       icon: <Badge size={52} />,        color: "#3F51B5", href: "/dashboard/vendeurs",      permKey: "vendeurVoir"     },
   { key: "fournisseurs",  label: "Fournisseurs",   icon: <Truck size={52} />,        color: "#795548", href: "/dashboard/fournisseurs",  permKey: "fournisseurVoir" },
-  { key: "fiche",         label: "Fiche",          icon: <FileText size={52} />,     color: "#E91E63", href: "/dashboard/fiche",         permKey: "ficheVoir"       },
+  
   { key: "workers",       label: "Employés",       icon: <HardHat size={52} />,      color: "#795548", href: "/dashboard/workers",       permKey: "workersVoir"     },
   { key: "notes",         label: "Notes",          icon: <StickyNote size={52} />,   color: "#FFC107", href: "/dashboard/notes",         permKey: "noteVoir"        },
   { key: "site-settings", label: "Paramètres du site", icon: <Globe size={52} />,    color: "#e63946", href: "/dashboard/site-settings", adminOnly: true            },

@@ -17,6 +17,7 @@ interface Product {
   map?: string; 
   isDeleted?: boolean;
   serialImei?: string;
+  grade?: string;
 }
 
 interface QuickButton {
@@ -83,6 +84,14 @@ function getMarqueLogo(marque: string): string | null {
 }
 function getFallbackImage(p: Product): string { return CAT_IMAGES[p.category] ?? CAT_IMAGES["Lòt"]; }
 function getCatColor(cat: string): string { return CAT_COLORS[cat] ?? "#636E72"; }
+const GRADE_COLORS: Record<string, string> = {
+  Neuf: "#00B894", A: "#0984E3", B: "#F79F1F", C: "#E17055", D: "#D63031",
+};
+function getGradeColor(g: string): string { return GRADE_COLORS[g] ?? "#636E72"; }
+function getGradeLabel(g: string): string { return g === "Neuf" ? "NEUF" : `GRADE ${g}`; }
+function formatHTG(usd: number, taux: number): string {
+  return `${Math.round(usd * taux).toLocaleString("fr-FR")} HTG`;
+}
 
 // ─── GOOGLE LOGIN MODAL ───────────────────────────────────────────────────────
 function GoogleLoginModal({ onClose, onSuccess }: {
@@ -154,10 +163,11 @@ function GoogleLoginModal({ onClose, onSuccess }: {
 
 
 // ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
-function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConfig = {} }: {
+function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConfig = {}, taux = 1 }: {
   product?: Product; products?: Product[];
   onClose: () => void; onPaymentConfirmed?: () => void;
   siteConfig?: Record<string, any>;
+  taux?: number;
 }) {
   const [step, setStep] = useState<"choose" | "moncash" | "natcash" | "bank" | "infos" | "confirm">("choose");
   const [selectedBank, setSelectedBank] = useState("BNC");
@@ -223,6 +233,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
             id: i.id,
             marque: i.marque,
             modele: i.modele,
+            grade: i.grade ?? "",
             prix: Number(i.prixVente),
           })),
           total: Number(total),
@@ -237,7 +248,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
     }
 
     // Voye WhatsApp
-    const lines = checkoutItems.map((i, idx) => `${idx + 1}. ${i.marque} ${i.modele} (ID: ${i.id}) - $${Number(i.prixVente).toLocaleString()}`).join("%0A");
+    const lines = checkoutItems.map((i, idx) => `${idx + 1}. ${i.marque} ${i.modele}${i.grade ? ` [Grade ${i.grade}]` : ""} (ID: ${i.id}) - $${Number(i.prixVente).toLocaleString()}`).join("%0A");
     const bankLine = method === "bank" ? `%0ABanque: ${selectedBank}` : "";
     const msg = `Bonjour MillionStore,%0A%0AUn client a passé une commande.%0A%0ANom: ${nom.trim()}%0ATéléphone: ${telephone.trim()}%0AAdresse: ${adresse.trim()}%0A%0AMéthode de paiement choisie: ${METHOD_LABELS[method]}${bankLine}%0A%0AProduits:%0A${lines}%0A%0ATotal: $${Number(total).toLocaleString()}%0A%0A⏳ En attente de confirmation du paiement.`;
     window.open(`https://wa.me/${whatsappNum}?text=${msg}`, "_blank", "noopener,noreferrer");
@@ -254,6 +265,9 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
             <div style={{ textAlign: "center", marginBottom: "20px" }}>
               <p style={{ margin: "0 0 4px", fontSize: "13px", color: "#888" }}>Total à payer</p>
               <p style={{ margin: 0, fontSize: "32px", fontWeight: 800, color: "#111" }}>${Number(total).toLocaleString()}</p>
+              {taux > 1 && (
+  <p style={{ margin: "4px 0 0", fontSize: "15px", fontWeight: 700, color: "#0984E3" }}>≈ {formatHTG(Number(total), taux)}</p>
+)}
               <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#888" }}>{orderLabel}</p>
             </div>
             {isMulti && (
@@ -427,10 +441,11 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
 }
 
 // ─── PRODUCT MODAL ────────────────────────────────────────────────────────────
-function ProductModal({ product, onClose, onAddToCart, siteConfig = {} }: {
+function ProductModal({ product, onClose, onAddToCart, siteConfig = {}, taux = 1 }: {
   product: Product; onClose: () => void;
   onAddToCart: (p: Product) => void;
   siteConfig?: Record<string, any>;
+  taux?: number;
 }) {
   const [imgIdx, setImgIdx] = useState(0);
   const [showPayment, setShowPayment] = useState(false);
@@ -468,6 +483,11 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {} }: {
 
         {/* Info */}
         <span style={{ background: `${color}18`, color, padding: "4px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 700 }}>{product.category}</span>
+        {product.grade && (
+  <span style={{ background: getGradeColor(product.grade), color: "#fff", padding: "4px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 800, marginLeft: "8px" }}>
+    {getGradeLabel(product.grade)}
+  </span>
+)}
         <p style={{ margin: "6px 0 2px", color: "#aaa", fontSize: "11px" }}>🔖 ID: {product.id || "—"}</p>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "8px 0 4px" }}>
           {logo && <img src={logo} alt={product.marque} style={{ height: "20px", objectFit: "contain" }} />}
@@ -487,6 +507,9 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {} }: {
   </div>
 )}
         <p style={{ fontSize: "32px", fontWeight: 800, color: "#111", margin: "8px 0 4px" }}>${Number(product.prixVente).toLocaleString()}</p>
+        {taux > 1 && (
+  <p style={{ margin: "0 0 8px", color: "#0984E3", fontWeight: 700, fontSize: "16px" }}>≈ {formatHTG(Number(product.prixVente), taux)}</p>
+)}
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: product.stock <= 2 ? "#fff3e0" : "#e8f5e9", color: product.stock <= 2 ? "#e65100" : "#2e7d32", padding: "4px 12px", borderRadius: "999px", fontSize: "13px", fontWeight: 600, marginBottom: "20px" }}>
           {product.stock <= 2 ? `⚠️ Seulement ${product.stock} restant!` : `✅ ${product.stock} en stock`}
         </div>
@@ -524,10 +547,11 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {} }: {
 }
 
 // ─── CART MODAL ───────────────────────────────────────────────────────────────
-function CartModal({ cart, onClose, onRemoveItem, onCheckout, onCheckoutAll, siteConfig = {} }: {
+function CartModal({ cart, onClose, onRemoveItem, onCheckout, onCheckoutAll, siteConfig = {}, taux = 1 }: {
   cart: Product[]; onClose: () => void; onRemoveItem: (i: number) => void;
   onCheckout: (p: Product) => void; onCheckoutAll: () => void;
   siteConfig?: Record<string, any>;
+  taux?: number;
 }) {
   const total = cart.reduce((s, i) => s + Number(i.prixVente || 0), 0);
   useEffect(() => {
@@ -539,8 +563,10 @@ function CartModal({ cart, onClose, onRemoveItem, onCheckout, onCheckoutAll, sit
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", maxHeight: "92vh", overflow: "auto", padding: "24px" }}>
         <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 16px" }} />
         <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#f1f1f1", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer" }}>×</button>
-        <h2 style={{ margin: "0 0 4px", color: "#111", fontSize: "20px" }}>🛒 Mon Panier ({cart.length})</h2>
-        <p style={{ margin: "0 0 16px", color: "#0b8457", fontWeight: 800, fontSize: "18px" }}>Total: ${total.toLocaleString()}</p>
+        <p style={{ margin: "0 0 4px", color: "#0b8457", fontWeight: 800, fontSize: "18px" }}>Total: ${total.toLocaleString()}</p>
+{taux > 1 && (
+  <p style={{ margin: "0 0 16px", color: "#0984E3", fontWeight: 700, fontSize: "14px" }}>≈ {formatHTG(total, taux)}</p>
+)}
         {cart.length === 0 ? (
           <p style={{ color: "#666", textAlign: "center", padding: "40px 0" }}>Panier vide. Ajoutez des produits!</p>
         ) : (
@@ -759,7 +785,8 @@ const [showGarantie, setShowGarantie] = useState(false);
       }
       if (!q) return true;
       // Tout champ yo ansanm nan yon sèl tekstè
-      const hay = `${p.id} ${p.marque} ${p.modele} ${p.description ?? ""} ${p.map ?? ""} ${p.category} ${p.serialImei ?? ""}`.toLowerCase();
+      const hay = `${p.id} ${p.marque} ${p.modele} ${p.description ?? ""} ${p.map ?? ""} ${p.category} ${p.serialImei ?? ""} grade ${p.grade ?? ""}`.toLowerCase();
+  
       // Chak mo dwe jwenn yon kote nan tekstè a (kèlkeswa lòd)
       return terms.every(term => hay.includes(term));
     })
@@ -806,7 +833,7 @@ const [showGarantie, setShowGarantie] = useState(false);
     <main style={{ fontFamily: "'Segoe UI', sans-serif", background: "#f4f4f4", minHeight: "100vh", paddingBottom: "70px" }}>
 
       {/* Modals */}
-      {selectedProduct && <ProductModal product={selectedProduct} siteConfig={siteConfig} onClose={() => setSelectedProduct(null)} onAddToCart={(p) => setCart(prev => [...prev, p])} />}
+      {selectedProduct && <ProductModal product={selectedProduct} siteConfig={siteConfig} taux={taux} onClose={() => setSelectedProduct(null)} onAddToCart={(p) => setCart(prev => [...prev, p])} />}
       {showCart && <CartModal cart={cart} siteConfig={siteConfig} onClose={() => setShowCart(false)} onRemoveItem={(i) => setCart(prev => prev.filter((_, idx) => idx !== i))} onCheckout={(p) => {
   setShowCart(false);
   const client = localStorage.getItem("ms_client_user");
@@ -1038,9 +1065,19 @@ const [showGarantie, setShowGarantie] = useState(false);
                       {logo && <img src={logo} alt={p.marque} style={{ height: "14px", objectFit: "contain" }} />}
                     </div>
                     <p style={{ margin: "0 0 4px", color: "#333", fontSize: "12px", fontWeight: 700 }}>🔖 ID: {p.id}</p>
+                    {p.grade && (
+  <span style={{ display: "inline-block", background: getGradeColor(p.grade), color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 800, marginBottom: "4px" }}>
+    {getGradeLabel(p.grade)}
+  </span>
+)}
                     <h3 style={{ margin: "0 0 4px", fontSize: "13px", color: "#111820", lineHeight: 1.3, fontWeight: 700 }}>{p.marque} {p.modele}</h3>
                     {p.description && <p style={{ margin: "0 0 6px", color: "#888", fontSize: "11px", lineHeight: 1.3 }}>{p.description.length > 50 ? p.description.slice(0, 50) + "…" : p.description}</p>}
-                    <p style={{ margin: "0 0 8px", color: "#111", fontWeight: 800, fontSize: "17px" }}>${Number(p.prixVente).toLocaleString()}</p>
+                    <div style={{ marginBottom: "8px" }}>
+  <p style={{ margin: 0, color: "#111", fontWeight: 800, fontSize: "17px" }}>${Number(p.prixVente).toLocaleString()}</p>
+  {taux > 1 && (
+    <p style={{ margin: "2px 0 0", color: "#0984E3", fontWeight: 700, fontSize: "12px" }}>≈ {formatHTG(Number(p.prixVente), taux)}</p>
+  )}
+</div>
                     <button onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }} style={{ width: "100%", borderRadius: "8px", border: "none", background: "#1a1a2e", color: "#fff", padding: "8px", fontWeight: 600, cursor: "pointer", fontSize: "12px" }}>
                       Voir détails
                     </button>
