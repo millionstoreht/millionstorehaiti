@@ -57,7 +57,7 @@ export default function InstallBanner() {
         display: "flex", alignItems: "center", gap: "12px",
         boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
       }}>
-        <img src="https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg" alt="MillionStore"
+        <img src="/logo-icon.png" alt="MillionStore"
           style={{ width: "40px", height: "40px", borderRadius: "10px", objectFit: "contain", background: "#fff" }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>Installer MillionStore</p>
