@@ -1,6 +1,6 @@
 // Chanje nimewo sa a CHAK FWA ou fè yon deplwaman enpòtan —
 // sa fòse tout ansyen "worker" yo efase e mete ajou otomatikman.
-const CACHE_NAME = "millionstore-v3";
+const CACHE_NAME = "millionstore-v4";
 const urlsToCache = ["/", "/login", "/mon-compte"];
 
 // ── INSTALL ── mete cache initial la, epi pran kontwòl imedyatman
