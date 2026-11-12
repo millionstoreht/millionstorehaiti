@@ -183,6 +183,7 @@ function applyKey(expr: string, justEval: boolean, k: string): { expr: string; j
 export default function CalculatricePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
+  const canOpen = !!user && (user.isAdmin || user.permissions?.calculatriceVoir === true);
 
   const [expr, setExpr] = useState("");
   const [justEval, setJustEval] = useState(false);
@@ -213,7 +214,7 @@ export default function CalculatricePage() {
 
   // ─── TAUX (parametres/taux, mis à jour en direct) + HISTORIQUE ─────────
   useEffect(() => {
-    if (!user) return;
+    if (!user || !canOpen) return;
     const cached = parseFloat(localStorage.getItem("taux_dollar_htg") ?? "");
     if (cached > 1) setTaux(cached);
     try {
@@ -231,7 +232,7 @@ export default function CalculatricePage() {
       if (n > 1) { setTaux(n); localStorage.setItem("taux_dollar_htg", String(n)); }
     }, () => {});
     return () => unsub();
-  }, [user]);
+  }, [user, canOpen]);
 
   // ─── CALCUL & DEVISES ──────────────────────────────────────────────────
   const { res, div0 } = useMemo(() => evalSafe(expr), [expr]);
@@ -320,6 +321,24 @@ export default function CalculatricePage() {
   };
 
   if (!user) return null;
+  
+  if (!canOpen) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0F1117", fontFamily: "'Segoe UI',sans-serif",
+        color: "#fff", display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 14, padding: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 54 }}>🔒</div>
+        <p style={{ color: "#aaa", margin: 0 }}>
+          Vous n&apos;avez pas la permission d&apos;utiliser la calculatrice.
+        </p>
+        <button onClick={() => router.push("/dashboard")}
+          style={{ background: ORANGE, border: "none", color: "#fff", borderRadius: 12,
+            padding: "10px 20px", cursor: "pointer", fontWeight: 700, fontFamily: "inherit" }}>
+          ← Retour
+        </button>
+      </main>
+    );
+  }
 
   // ─── AFFICHAGE ─────────────────────────────────────────────────────────
   let main = !expr ? "0" : div0 ? "Division par 0"

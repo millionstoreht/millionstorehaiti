@@ -1,6 +1,6 @@
 // Chanje nimewo sa a CHAK FWA ou fè yon deplwaman enpòtan —
 // sa fòse tout ansyen "worker" yo efase e mete ajou otomatikman.
-const CACHE_NAME = "millionstore-v2";
+const CACHE_NAME = "millionstore-v3";
 const urlsToCache = ["/", "/login", "/mon-compte"];
 
 // ── INSTALL ── mete cache initial la, epi pran kontwòl imedyatman
@@ -27,12 +27,17 @@ self.addEventListener("activate", (event) => {
 // ── FETCH ── estrateji "network-first": toujou eseye chèche nouvo vèsyon
 // sou sèvè a anvan; sèvi ak cache a SÈLMAN si pa gen entènèt
 self.addEventListener("fetch", (event) => {
+  // Kite demann ki pa GET (POST, elatriye) ak lòt pwotokòl pase nòmalman
+  if (event.request.method !== "GET" || !event.request.url.startsWith("http")) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Sove nouvo vèsyon an nan cache pou lè li pa gen entènèt
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        // Sove nouvo vèsyon an nan cache sèlman si repons lan bon
+        if (response && response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(event.request)) // offline → sèvi ak cache

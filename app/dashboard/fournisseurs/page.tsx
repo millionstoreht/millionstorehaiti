@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "../../../lib/firebase";
+import { db, auth } from "../../../lib/firebase";
+import {
+  EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential, type User,
+} from "firebase/auth";
 import {
   collection, doc, getDoc, getDocs, setDoc, onSnapshot, runTransaction, serverTimestamp,
 } from "firebase/firestore";
@@ -22,7 +25,8 @@ interface Hist {
   billNo?: string; productId?: string; marque?: string; modele?: string;
   categorie?: string; qty?: number; produitDescription?: string;
   clientNom?: string; vendeurNom?: string; cashier?: string;
-  parAdmin?: string; opId?: string; venteDate?: string;
+  parAdmin?: string; par?: string; note?: string; opId?: string; venteDate?: string;
+  factureId?: string; ventId?: string; nomDealer?: string;
 }
 interface Compte { id: string; nom: string; balance: number; historique: Hist[]; }
 
@@ -50,21 +54,59 @@ const fmtDateHeure = (raw?: string) => {
   return `${p(dt.getDate())}/${p(dt.getMonth() + 1)}/${dt.getFullYear()}  ${p(dt.getHours())}:${p(dt.getMinutes())}`;
 };
 
-/** Disponib (15j+) ak an atant. Retrait/Dépôt konte touswit.
- *  Annilasyon konte depi dat vant orijinal la (venteDate). */
+/** Disponib (15j+) ak an atant. Retrait / livraison / annulation_livraison konte touswit.
+ *  Dépôt, vant, salè: an atant pandan 15 jou. Annilasyon / restorasyon konte depi
+ *  dat vant orijinal la (venteDate). (Menm règ ak app Flutter la.) */
 function calcDisponibleEtAtente(c: { historique?: Hist[] }) {
   const now = Date.now();
   let disponible = 0, enAttente = 0;
   for (const e of c.historique ?? []) {
     const type = e.type ?? "";
     const delta = Number(e.delta ?? 0);
-    if (type === "retrait" || type === "depot") { disponible += delta; continue; }
-    const ref = type === "annulation" ? (e.venteDate ?? e.date) : e.date;
+    if (type === "retrait" || type === "livraison" || type === "annulation_livraison") {
+      disponible += delta; continue;
+    }
+    const ref = (type === "annulation" || type === "restauration") ? (e.venteDate ?? e.date) : e.date;
     const dt = ref ? new Date(ref).getTime() : NaN;
     if (isNaN(dt) || (now - dt) / 86400000 >= 15) disponible += delta;
     else enAttente += delta;
   }
   return { disponible: r2(disponible), enAttente: r2(enAttente) };
+}
+
+/** ID long → version courte pour l'affichage (8 derniers caractères). */
+const shortId = (raw?: string) => {
+  const t = (raw ?? "").toString().trim();
+  return t.length <= 10 ? t : `…${t.slice(-8)}`;
+};
+
+/** Nettoie la note : espaces doubles retirés, 200 caractères maximum. */
+const cleanNote = (raw: string) => raw.replace(/\s+/g, " ").trim().slice(0, 200);
+
+// ─── VÉRIFICATION DU MOT DE PASSE ────────────────────────────────────────────
+function currentAuthUser(): Promise<User | null> {
+  return new Promise(resolve => {
+    if (auth.currentUser) { resolve(auth.currentUser); return; }
+    const off = onAuthStateChanged(auth, u => { off(); resolve(u); });
+  });
+}
+
+async function verifyPassword(pw: string): Promise<{ ok: boolean; message?: string }> {
+  const u = await currentAuthUser();
+  if (!u || !u.email) return { ok: false, message: "Session expirée. Reconnectez-vous." };
+  try {
+    await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, pw));
+    return { ok: true };
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+      return { ok: false, message: "Mot de passe incorrect" };
+    }
+    if (code === "auth/too-many-requests") {
+      return { ok: false, message: "Trop de tentatives. Réessayez dans quelques minutes." };
+    }
+    return { ok: false, message: "Vérification impossible. Réessayez." };
+  }
 }
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
@@ -83,6 +125,7 @@ export default function FournisseursPage() {
   const [showComm, setShowComm] = useState(false);
   const [mvt, setMvt] = useState<{ retrait: boolean } | null>(null);
   const [snack, setSnack] = useState<{ msg: string; color: string } | null>(null);
+  const [delCompte, setDelCompte] = useState<Compte | null>(null);
 
   const showSnack = (msg: string, color: string) => {
     setSnack({ msg, color });
@@ -181,11 +224,21 @@ export default function FournisseursPage() {
     return products.filter(p => (p.nomDealer ?? "").trim().toLowerCase() === k && p.isDeleted !== true);
   };
 
+  // ─── PERMISSIONS (admin a tous les droits) ───────────────────────────────
+  const actor = ((user?.username ?? "").trim() || (user?.displayName ?? "").trim());
+  const canDepotEff = !!user && (user.isAdmin || user.permissions?.fournisseurDepot === true);
+  const canRetraitEff = !!user && (user.isAdmin || user.permissions?.fournisseurRetrait === true);
+  const seeAll = canDepotEff || canRetraitEff;
+
   // ─── OPERASYON: RETRAIT / DÉPÔT FOUNISÈ ──────────────────────────────────
-  const fournisseurMouvement = async (nom: string, montantBrut: number, retrait: boolean, opId: string) => {
+  const fournisseurMouvement = async (nom: string, montantBrut: number, retrait: boolean, opId: string, note: string) => {
     const m = r2(montantBrut);
     const key = nom.toLowerCase();
     const ref = doc(db, "locals", lid, "fournisseurs_comptes", key);
+    if (retrait ? !canRetraitEff : !canDepotEff) {
+      showSnack("⛔ Vous n'avez pas la permission de faire un " + (retrait ? "retrait" : "dépôt") + ".", C.red);
+      return;
+    }
     return guard(async () => {
       try {
         await withTimeout(runTransaction(db, async (tx) => {
@@ -210,7 +263,7 @@ export default function FournisseursPage() {
             description: retrait
               ? `Retrait effectué vous avez retiré ${m.toFixed(2)}$ vous avez maintenant ${apres.toFixed(2)}$. Solde actuel est ${apres.toFixed(2)}$`
               : `Dépôt effectué de ${m.toFixed(2)}$ vous aviez ${avant.toFixed(2)}$ vous avez maintenant ${apres.toFixed(2)}$. Solde actuel est ${apres.toFixed(2)}$`,
-            parAdmin: user?.username ?? "admin", opId,
+            parAdmin: actor, ...(note ? { note } : {}), opId,
           });
           tx.set(ref, { ...current, nom, balance: apres, historique: hist });
         }), 12000);
@@ -224,9 +277,10 @@ export default function FournisseursPage() {
   };
 
   // ─── OPERASYON: RETRAIT MILLIONSTORE (tout balans, san 15 jou) ───────────
-  const msRetrait = async (montantBrut: number, opId: string) => {
+  const msRetrait = async (montantBrut: number, opId: string, note: string) => {
     const m = r2(montantBrut);
     const ref = doc(db, "locals", lid, "millionstore", "compte");
+    if (!user?.isAdmin) { showSnack("⛔ Réservé aux administrateurs.", C.red); return; }
     return guard(async () => {
       try {
         await withTimeout(runTransaction(db, async (tx) => {
@@ -241,7 +295,7 @@ export default function FournisseursPage() {
             type: "retrait", date: new Date().toISOString(), delta: -m,
             soldeAvant: avant, soldeApres: apres,
             description: `Retrait effectué vous avez retiré ${m.toFixed(2)}$ vous avez maintenant ${apres.toFixed(2)}$. Solde actuel est ${apres.toFixed(2)}$`,
-            parAdmin: user?.username ?? "admin", opId,
+            parAdmin: actor, ...(note ? { note } : {}), opId,
           });
           tx.set(ref, { ...current, balance: apres, historique: hist });
         }), 12000);
@@ -250,6 +304,37 @@ export default function FournisseursPage() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Erè";
         showSnack(msg === "TIMEOUT" ? "Rezo twò dousman. Verifye balans lan anvan w reeseye." : "❌ " + msg, C.red);
+      }
+    });
+  };
+
+  // ─── SUPPRIMER UN COMPTE FOURNISSEUR (admin, solde = 0) ──────────────────
+  const requestDeleteCompte = (c: Compte) => {
+    if (busyRef.current || !user?.isAdmin) return;
+    if (Math.abs(c.balance) > 0.005) {
+      showSnack("Balans dwe $0 anvan w siprime kont lan.", C.red);
+      return;
+    }
+    setDelCompte(c);
+  };
+
+  const deleteCompte = async (c: Compte) => {
+    const key = c.nom.toLowerCase().trim();
+    const ref = doc(db, "locals", lid, "fournisseurs_comptes", key);
+    return guard(async () => {
+      try {
+        await withTimeout(runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) return;
+          const bal = Number(snap.data()?.balance ?? 0);
+          if (Math.abs(bal) > 0.005) throw new Error(`Kont lan gen $${bal.toFixed(2)}. Balans dwe 0 pou siprime l.`);
+          tx.delete(ref);
+        }), 12000);
+        setDelCompte(null); setDetailKey(null);
+        showSnack("✅ Kont siprime.", C.green);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erè";
+        showSnack(msg === "TIMEOUT" ? "Rezo twò dousman. Verifye anvan w reeseye." : "❌ " + msg, C.red);
       }
     });
   };
@@ -276,16 +361,16 @@ export default function FournisseursPage() {
     : allComptes.find(c => c.id.toLowerCase() === detailKey)
       ?? { id: detailKey, nom: detailKey, balance: 0, historique: [] };
 
-  // Non-admin: li wè sèlman pwòp kont li
-  if (!user.isAdmin) {
+  // Sans droit de dépôt/retrait : il ne voit que son propre compte
+  if (!seeAll) {
     const mine = allComptes.find(c => c.id.toLowerCase() === myKey)
       ?? { id: myKey, nom: user.username, balance: 0, historique: [] };
     return (
       <>
-        <CompteDetail compte={mine} isMs={false} isAdmin={false}
+        <CompteDetail compte={mine} isMs={false} isAdmin={false} canDepot={false} canRetrait={false}
           produits={produitsAsiyen(mine.nom)} busy={busy}
           onBack={() => router.push("/dashboard")}
-          onRetrait={() => {}} onDepot={() => {}} />
+          onRetrait={() => {}} onDepot={() => {}} onDelete={() => {}} />
         {snack && <Snack {...snack} />}
       </>
     );
@@ -310,12 +395,12 @@ export default function FournisseursPage() {
           </button>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Fournisseurs</h1>
         </div>
-        <button onClick={() => setShowComm(true)} title="Komisyon MILLIONSTORE"
+        {user.isAdmin && <button onClick={() => setShowComm(true)} title="Komisyon MILLIONSTORE"
           style={{ background: `${C.accent}22`, border: `1px solid ${C.accent}66`,
             color: C.accent, padding: "8px 14px", borderRadius: 10,
             cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
           % Komisyon
-        </button>
+        </button>}
       </div>
 
       <div style={{ maxWidth: 860, margin: "0 auto", padding: 16 }}>
@@ -351,8 +436,8 @@ export default function FournisseursPage() {
           ))}
         </div>
 
-        {/* MILLIONSTORE */}
-        <div onClick={() => setDetailKey("__ms__")}
+        {/* MILLIONSTORE (admin seulement) */}
+        {user.isAdmin && <div onClick={() => setDetailKey("__ms__")}
           style={{ background: `linear-gradient(90deg, ${C.gold}2e, ${C.gold}0d)`,
             border: `1px solid ${C.gold}59`, borderRadius: 16, padding: 16,
             marginBottom: 14, cursor: "pointer", display: "flex",
@@ -365,7 +450,7 @@ export default function FournisseursPage() {
           </div>
           <span style={{ color: C.gold, fontWeight: 700, fontSize: 18 }}>${ms.balance.toFixed(2)}</span>
           <span style={{ color: "#444" }}>›</span>
-        </div>
+        </div>}
 
         <p style={{ color: "#666", fontWeight: 700, fontSize: 12, letterSpacing: 1.2, margin: "0 0 10px" }}>
           FOUNISÈ
@@ -412,22 +497,31 @@ export default function FournisseursPage() {
       {/* DETAY KONT */}
       {detailCompte && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, background: C.dark, overflowY: "auto" }}>
-          <CompteDetail compte={detailCompte} isMs={isMsDetail} isAdmin
+          <CompteDetail compte={detailCompte} isMs={isMsDetail} isAdmin={user.isAdmin}
+            canDepot={isMsDetail ? false : canDepotEff}
+            canRetrait={isMsDetail ? user.isAdmin : canRetraitEff}
             produits={isMsDetail ? [] : produitsAsiyen(detailCompte.nom)} busy={busy}
             onBack={() => setDetailKey(null)}
             onRetrait={() => setMvt({ retrait: true })}
-            onDepot={() => setMvt({ retrait: false })} />
+            onDepot={() => setMvt({ retrait: false })}
+            onDelete={() => requestDeleteCompte(detailCompte)} />
         </div>
       )}
 
       {/* MODAL RETRAIT / DÉPÔT */}
       {mvt && detailCompte && (
         <MouvementModal retrait={mvt.retrait} isMs={isMsDetail}
-          compte={detailCompte} busy={busy}
+          compte={detailCompte} busy={busy} actor={actor} notify={showSnack}
           onClose={() => setMvt(null)}
-          onConfirm={(m, opId) => isMsDetail
-            ? msRetrait(m, opId)
-            : fournisseurMouvement(detailCompte.nom, m, mvt.retrait, opId)} />
+          onConfirm={(m, opId, note) => isMsDetail
+            ? msRetrait(m, opId, note)
+            : fournisseurMouvement(detailCompte.nom, m, mvt.retrait, opId, note)} />
+      )}
+
+      {/* SUPPRIMER KONT */}
+      {delCompte && (
+        <DeleteCompteModal compte={delCompte} busy={busy} notify={showSnack}
+          onClose={() => setDelCompte(null)} onConfirm={() => deleteCompte(delCompte)} />
       )}
 
       {/* KOMISYON */}
@@ -441,9 +535,10 @@ export default function FournisseursPage() {
 }
 
 // ─── DETAY YON KONT ──────────────────────────────────────────────────────────
-function CompteDetail({ compte, isMs, isAdmin, produits, busy, onBack, onRetrait, onDepot }: {
-  compte: Compte; isMs: boolean; isAdmin: boolean; produits: Product[]; busy: boolean;
-  onBack: () => void; onRetrait: () => void; onDepot: () => void;
+function CompteDetail({ compte, isMs, isAdmin, canDepot, canRetrait, produits, busy, onBack, onRetrait, onDepot, onDelete }: {
+  compte: Compte; isMs: boolean; isAdmin: boolean; canDepot: boolean; canRetrait: boolean;
+  produits: Product[]; busy: boolean;
+  onBack: () => void; onRetrait: () => void; onDepot: () => void; onDelete: () => void;
 }) {
   const [showProd, setShowProd] = useState(false);
   const calc = calcDisponibleEtAtente(compte);
@@ -459,7 +554,12 @@ function CompteDetail({ compte, isMs, isAdmin, produits, busy, onBack, onRetrait
         <button onClick={onBack}
           style={{ background: "#ffffff18", border: "none", color: "#aaa",
             padding: "8px 14px", borderRadius: 10, cursor: "pointer" }}>←</button>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{isMs ? "MILLIONSTORE" : compte.nom}</h2>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, flex: 1 }}>{isMs ? "MILLIONSTORE" : compte.nom}</h2>
+        {isAdmin && !isMs && (
+          <button onClick={onDelete} disabled={busy} title="Siprime kont lan"
+            style={{ background: "#ff525218", border: "none", color: C.red,
+              padding: "8px 12px", borderRadius: 10, cursor: busy ? "default" : "pointer" }}>🗑</button>
+        )}
       </div>
 
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
@@ -472,25 +572,27 @@ function CompteDetail({ compte, isMs, isAdmin, produits, busy, onBack, onRetrait
             {!isMs && <StatBox label="En attente (15j)" value={atn} color={C.gold} />}
           </div>
 
-          {isAdmin ? (
+          {(canRetrait || (canDepot && !isMs)) ? (
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              {canRetrait && (
               <button onClick={onRetrait} disabled={busy}
                 style={{ flex: 1, padding: 12, border: "none", borderRadius: 12,
                   background: busy ? "#555" : C.red, color: "#fff", fontWeight: 700,
                   cursor: "pointer" }}>↑ Retrait</button>
-              {!isMs && (
+              )}
+              {canDepot && !isMs && (
                 <button onClick={onDepot} disabled={busy}
                   style={{ flex: 1, padding: 12, border: "none", borderRadius: 12,
                     background: busy ? "#555" : C.green, color: "#000", fontWeight: 700,
                     cursor: "pointer" }}>↓ Dépôt</button>
               )}
             </div>
-          ) : (
+          ) : !isAdmin ? (
             <p style={{ margin: "14px auto 0", color: "#666", fontSize: 11,
               background: "#ffffff0d", display: "inline-block", padding: "8px 12px", borderRadius: 10 }}>
               ℹ️ Kontakte yon admin pou retrait/dépôt
             </p>
-          )}
+          ) : null}
         </div>
 
         {!isMs && (
@@ -549,18 +651,27 @@ function HistCard({ e }: { e: Hist }) {
   const meta: Record<string, { icon: string; color: string }> = {
     vente: { icon: "🛒", color: C.green },
     annulation: { icon: "🚫", color: C.red },
+    restauration: { icon: "♻️", color: C.green },
     retrait: { icon: "↑", color: C.red },
     depot: { icon: "↓", color: C.green },
+    annulation_livraison: { icon: "↩", color: "#FFC107" },
+    livraison: { icon: "🛵", color: "#FF9800" },
+    salaire: { icon: "💵", color: "#FFC107" },
   };
   const { icon, color } = meta[e.type] ?? { icon: "🧾", color: "#888" };
-  const hasDetails = e.type === "vente" || e.type === "annulation";
+  const hasDetails = e.type === "vente" || e.type === "annulation" || e.type === "restauration";
   const rows: string[] = [];
   if (e.marque || e.modele) rows.push(`📱 ${`${e.marque ?? ""} ${e.modele ?? ""}`.trim()}`);
   if (e.productId) rows.push(`🏷 ID: ${e.productId}`);
+  if (e.factureId) rows.push(`🧾 Facture: ${shortId(e.factureId)}`);
+  if (e.ventId) rows.push(`🔗 Vente: ${shortId(e.ventId)}`);
+  if ((e.nomDealer ?? "").trim()) rows.push(`🤝 Dealer: ${(e.nomDealer ?? "").trim()}`);
   if (e.produitDescription) rows.push(`📝 ${e.produitDescription}`);
   if (e.clientNom) rows.push(`👤 Client: ${e.clientNom}`);
   if (e.vendeurNom) rows.push(`🧑‍💼 Vendeur: ${e.vendeurNom}`);
   if (e.cashier) rows.push(`💳 Caissier: ${e.cashier}`);
+  const par = (e.par ?? e.parAdmin ?? "").toString().trim();
+  const note = (e.note ?? "").toString();
 
   return (
     <div style={{ background: C.card, borderRadius: 14, padding: 12, marginBottom: 10,
@@ -586,39 +697,71 @@ function HistCard({ e }: { e: Hist }) {
           ))}
         </div>
       )}
+      {par && <p style={{ margin: "6px 0 0", color: "#999", fontSize: 11 }}>👤 Par: {par}</p>}
+      {note && <p style={{ margin: "4px 0 0", color: "#999", fontSize: 11 }}>📝 {note}</p>}
     </div>
   );
 }
 
 // ─── MODAL RETRAIT / DÉPÔT ───────────────────────────────────────────────────
-function MouvementModal({ retrait, isMs, compte, busy, onClose, onConfirm }: {
-  retrait: boolean; isMs: boolean; compte: Compte; busy: boolean;
-  onClose: () => void; onConfirm: (m: number, opId: string) => void;
+function MouvementModal({ retrait, isMs, compte, busy, actor, notify, onClose, onConfirm }: {
+  retrait: boolean; isMs: boolean; compte: Compte; busy: boolean; actor: string;
+  notify: (m: string, c: string) => void;
+  onClose: () => void; onConfirm: (m: number, opId: string, note: string) => void;
 }) {
   const [val, setVal] = useState("");
+  const [userVal, setUserVal] = useState("");
+  const [pass, setPass] = useState("");
+  const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [errUser, setErrUser] = useState<string | null>(null);
+  const [errPass, setErrPass] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [essais, setEssais] = useState(0);
   // menm opId si w reeseye nan menm modal la
   const [opId] = useState(() => `${Date.now()}${Math.floor(Math.random() * 1e6)}`);
   const disp = isMs ? compte.balance : calcDisponibleEtAtente(compte).disponible;
   const color = retrait ? C.red : C.green;
+  const lock = busy || verifying;
 
-  const submit = () => {
-    if (busy) return;
+  const submit = async () => {
+    if (lock) return;
     const m = parseFloat(val.replace(",", "."));
     if (isNaN(m) || m <= 0) { setErr("Antre yon montan valab."); return; }
     if (m > 1000000) { setErr("Montan twò wo."); return; }
-    if (retrait && m > disp + 0.001) { setErr("Depase montan disponib la."); return; }
-    onConfirm(r2(m), opId);
+    const mm = r2(m);
+    if (retrait && Math.round(mm * 100) > Math.round(disp * 100)) { setErr("Depase montan disponib la."); return; }
+    const typed = userVal.trim();
+    if (!typed) { setErrUser("Nom d'utilisateur obligatoire"); return; }
+    if (typed.toLowerCase() !== actor.toLowerCase()) { setErrUser("Nom d'utilisateur incorrect"); return; }
+    if (!pass) { setErrPass("Mot de passe obligatoire"); return; }
+    setVerifying(true);
+    const r = await verifyPassword(pass);
+    setVerifying(false);
+    if (!r.ok) {
+      const n = essais + 1;
+      setEssais(n);
+      if (n >= 5) { onClose(); notify("Trop de tentatives. Action annulée.", C.red); return; }
+      setErrPass(r.message ?? "Mot de passe incorrect");
+      return;
+    }
+    onConfirm(mm, opId, cleanNote(note));
+  };
+
+  const field: React.CSSProperties = {
+    width: "100%", padding: "12px 14px", background: "#ffffff14", border: "none",
+    borderRadius: 12, color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box",
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 300,
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-      onClick={busy ? undefined : onClose}>
+      onClick={lock ? undefined : onClose}>
       <div onClick={e => e.stopPropagation()}
-        style={{ background: C.card, borderRadius: 18, padding: 22, width: "100%", maxWidth: 400 }}>
+        style={{ background: C.card, borderRadius: 18, padding: 22, width: "100%", maxWidth: 400,
+          maxHeight: "92vh", overflowY: "auto" }}>
         <h3 style={{ margin: "0 0 14px", color }}>{retrait ? "↑ Retrait" : "↓ Dépôt"}</h3>
-        {retrait && (
+        {retrait ? (
           <>
             <p style={{ margin: 0, color: C.green, fontWeight: 700, fontSize: 13 }}>
               Disponib pou retrait: ${disp.toFixed(2)}
@@ -627,23 +770,101 @@ function MouvementModal({ retrait, isMs, compte, busy, onClose, onConfirm }: {
               {isMs ? "Ou ka retire tout balans lan." : "Sèlman lajan ki gen 15 jou oswa plis ka retire."}
             </p>
           </>
+        ) : (
+          <p style={{ margin: "0 0 14px", color: "#FFAB40", fontSize: 12 }}>
+            Depo sa a ap an atant pandan 15 jou anvan l disponib.
+          </p>
         )}
-        <input type="number" step="0.01" autoFocus value={val} disabled={busy}
+        <input type="number" step="0.01" autoFocus value={val} disabled={lock}
           onChange={e => { setVal(e.target.value); setErr(null); }}
           onKeyDown={e => { if (e.key === "Enter") submit(); }}
-          placeholder="Montan ($)"
-          style={{ width: "100%", padding: "12px 14px", background: "#ffffff14", border: "none",
-            borderRadius: 12, color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+          placeholder="Montan ($)" style={field} />
         {err && <p style={{ color: C.red, fontSize: 12, margin: "6px 0 0" }}>{err}</p>}
+
+        <input value={userVal} disabled={lock} autoComplete="off" spellCheck={false}
+          onChange={e => { setUserVal(e.target.value); setErrUser(null); }}
+          placeholder="Votre nom d'utilisateur (obligatoire)" style={{ ...field, marginTop: 10 }} />
+        {errUser && <p style={{ color: C.red, fontSize: 12, margin: "6px 0 0" }}>{errUser}</p>}
+
+        <input type="password" value={pass} disabled={lock} autoComplete="new-password"
+          onChange={e => { setPass(e.target.value); setErrPass(null); }}
+          onKeyDown={e => { if (e.key === "Enter") submit(); }}
+          placeholder="Mot de passe (obligatoire)" style={{ ...field, marginTop: 10 }} />
+        {errPass && <p style={{ color: C.red, fontSize: 12, margin: "6px 0 0" }}>{errPass}</p>}
+
+        <textarea value={note} disabled={lock} maxLength={200} rows={2}
+          onChange={e => setNote(e.target.value)}
+          placeholder="Note (optionnel)"
+          style={{ ...field, marginTop: 10, resize: "vertical", fontFamily: "inherit" }} />
+
         <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button onClick={onClose} disabled={busy}
+          <button onClick={onClose} disabled={lock}
             style={{ flex: 1, padding: 12, background: "#ffffff0a", border: "none",
               borderRadius: 12, cursor: "pointer", color: "#888" }}>Anile</button>
-          <button onClick={submit} disabled={busy}
-            style={{ flex: 1, padding: 12, background: busy ? "#555" : color, border: "none",
+          <button onClick={submit} disabled={lock}
+            style={{ flex: 1, padding: 12, background: lock ? "#555" : color, border: "none",
               borderRadius: 12, cursor: "pointer", fontWeight: 700,
               color: retrait ? "#fff" : "#000" }}>
-            {busy ? "..." : retrait ? "Konfime Retrait" : "Konfime Dépôt"}
+            {lock ? "..." : retrait ? "Konfime Retrait" : "Konfime Dépôt"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL SUPPRESSION D'UN COMPTE FOURNISSEUR ───────────────────────────────
+function DeleteCompteModal({ compte, busy, notify, onClose, onConfirm }: {
+  compte: Compte; busy: boolean; notify: (m: string, c: string) => void;
+  onClose: () => void; onConfirm: () => void;
+}) {
+  const [pass, setPass] = useState("");
+  const [errPass, setErrPass] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [essais, setEssais] = useState(0);
+  const lock = busy || verifying;
+
+  const submit = async () => {
+    if (lock) return;
+    if (!pass) { setErrPass("Mot de passe obligatoire"); return; }
+    setVerifying(true);
+    const r = await verifyPassword(pass);
+    setVerifying(false);
+    if (!r.ok) {
+      const n = essais + 1;
+      setEssais(n);
+      if (n >= 5) { onClose(); notify("Trop de tentatives. Action annulée.", C.red); return; }
+      setErrPass(r.message ?? "Mot de passe incorrect");
+      return;
+    }
+    onConfirm();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 300,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={lock ? undefined : onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: C.card, borderRadius: 18, padding: 22, width: "100%", maxWidth: 400 }}>
+        <h3 style={{ margin: "0 0 10px", color: C.red }}>🗑 Siprime kont founisè a ?</h3>
+        <p style={{ margin: "0 0 12px", color: "#999", fontSize: 13, lineHeight: 1.5 }}>
+          {compte.nom}<br />Istorik la ap disparèt pou toujou.
+        </p>
+        <input type="password" autoFocus value={pass} disabled={lock} autoComplete="new-password"
+          onChange={e => { setPass(e.target.value); setErrPass(null); }}
+          onKeyDown={e => { if (e.key === "Enter") submit(); }}
+          placeholder="Mot de passe (obligatoire)"
+          style={{ width: "100%", padding: "12px 14px", background: "#ffffff14", border: "none",
+            borderRadius: 12, color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+        {errPass && <p style={{ color: C.red, fontSize: 12, margin: "6px 0 0" }}>{errPass}</p>}
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <button onClick={onClose} disabled={lock}
+            style={{ flex: 1, padding: 12, background: "#ffffff0a", border: "none",
+              borderRadius: 12, cursor: "pointer", color: "#888" }}>Non</button>
+          <button onClick={submit} disabled={lock}
+            style={{ flex: 1, padding: 12, background: lock ? "#555" : C.red, border: "none",
+              borderRadius: 12, cursor: "pointer", fontWeight: 700, color: "#fff" }}>
+            {lock ? "..." : "Oui, siprime"}
           </button>
         </div>
       </div>

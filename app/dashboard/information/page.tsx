@@ -37,6 +37,7 @@ interface UserSession {
   username: string;
   displayName: string;
   isAdmin: boolean;
+  permissions?: Record<string, boolean>;
 }
 
 const COLLECTION = "info_tabs";
@@ -149,17 +150,23 @@ export default function InformationPage() {
   const [confirmDelete, setConfirmDelete] = useState<InfoTab | null>(null);
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  
+  const perm = (k: string, def = false) => user?.permissions?.[k] ?? def;
+  const canView   = !!user && (user.isAdmin || perm("informationVoir", true) === true);
+  const canAdd    = !!user && (user.isAdmin || perm("informationAjoute") === true);
+  const canEdit   = !!user && (user.isAdmin || perm("informationModifye") === true);
+  const canDelete = !!user && (user.isAdmin || perm("informationSiprime") === true);
 
   // ── Sesyon itilizatè (pou konnen si se admin) ─────────────────────
   useEffect(() => {
     const raw = localStorage.getItem("ms_web_user");
-    if (raw) {
-      try { setUser(JSON.parse(raw)); } catch { /* ignore */ }
-    }
-  }, []);
+    if (!raw) { router.push("/login"); return; }
+    try { setUser(JSON.parse(raw)); } catch { router.push("/login"); }
+  }, [router]);
 
   // ── Stream tab yo an tan reyèl ─────────────────────────────────────
   useEffect(() => {
+    if (!canView) return;
     const q = query(collection(db, COLLECTION), orderBy("lod"));
     const unsub = onSnapshot(q, (snap) => {
       const data: InfoTab[] = snap.docs.map((d) => {
@@ -184,7 +191,7 @@ export default function InformationPage() {
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [canView]);
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -234,6 +241,26 @@ export default function InformationPage() {
 
   const activeTab = tabs[activeIdx];
 
+  
+  if (!user) return null;
+  if (!canView) {
+    return (
+      <main style={{ minHeight: "100vh", background: kGris, fontFamily: "'Segoe UI', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 14, padding: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 54 }}>🔒</div>
+        <p style={{ color: "#666", margin: 0 }}>
+          Vous n&apos;avez pas la permission de voir les informations.
+        </p>
+        <button onClick={() => router.push("/dashboard")}
+          style={{ background: kBleu, border: "none", color: "#fff", borderRadius: 12,
+            padding: "10px 20px", cursor: "pointer", fontWeight: 700 }}>
+          ← Retour
+        </button>
+      </main>
+    );
+  }
+
   // ── Loading ──────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -262,21 +289,23 @@ export default function InformationPage() {
           </div>
         </div>
 
-        {user?.isAdmin && (
+        {(canAdd || canEdit || canDelete) && (
           <div style={{ display: "flex", gap: 8 }}>
-            {activeTab && (
-              <>
-                <IconBtn color="#2196F3" onClick={() => { setEditingTab(activeTab); setFormOpen(true); }} title="Modifye tab sa a">
-                  <Pencil size={16} />
-                </IconBtn>
-                <IconBtn color="#FF5252" onClick={() => setConfirmDelete(activeTab)} title="Siprime tab sa a">
-                  <Trash2 size={16} />
-                </IconBtn>
-              </>
+            {activeTab && canEdit && (
+              <IconBtn color="#2196F3" onClick={() => { setEditingTab(activeTab); setFormOpen(true); }} title="Modifye tab sa a">
+                <Pencil size={16} />
+              </IconBtn>
             )}
-            <IconBtn color="#fff" onClick={() => { setEditingTab(null); setFormOpen(true); }} title="Ajoute yon tab">
-              <Plus size={18} />
-            </IconBtn>
+            {activeTab && canDelete && (
+              <IconBtn color="#FF5252" onClick={() => setConfirmDelete(activeTab)} title="Siprime tab sa a">
+                <Trash2 size={16} />
+              </IconBtn>
+            )}
+            {canAdd && (
+              <IconBtn color="#fff" onClick={() => { setEditingTab(null); setFormOpen(true); }} title="Ajoute yon tab">
+                <Plus size={18} />
+              </IconBtn>
+            )}
           </div>
         )}
       </div>
@@ -286,7 +315,7 @@ export default function InformationPage() {
         <div style={{ textAlign: "center", padding: "80px 20px" }}>
           <p style={{ fontSize: 48, margin: "0 0 12px" }}>ℹ️</p>
           <p style={{ color: "#999", fontSize: 15, margin: "0 0 18px" }}>Pa gen tab ankò</p>
-          {user?.isAdmin && (
+          {canAdd && (
             <button
               onClick={() => { setEditingTab(null); setFormOpen(true); }}
               style={{ background: kBleu, color: "#fff", border: "none", borderRadius: 12, padding: "12px 22px", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}

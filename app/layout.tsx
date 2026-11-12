@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import InstallBanner from "./components/InstallBanner";
@@ -13,6 +13,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#1a1a2e",
+};
+
 export const metadata: Metadata = {
   title: "MillionStore Haiti",
   description: "Achte òdinatè, telefòn ak akseswa teknoloji ann Ayiti. Livrezon rapid toupatou.",
@@ -20,7 +24,14 @@ export const metadata: Metadata = {
     google: "q0Gz-4UAT2WjLrXEq_BrFJkher876tD71-5zVG5bnEI",
   },
   manifest: "/manifest.json",
-  themeColor: "#1a1a2e",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -31,7 +42,7 @@ export const metadata: Metadata = {
     description: "Achte òdinatè, telefòn ak akseswa teknoloji ann Ayiti. Livrezon rapid toupatou.",
     url: "https://millionstorehaiti.vercel.app",
     siteName: "MillionStore Haiti",
-    images: [{ url: "https://i.ibb.co/pvVKNTm8/product-054-H-img1.jpg", width: 1200, height: 630 }],
+    images: [{ url: "https://millionstorehaiti.vercel.app/og-image.png", width: 1200, height: 630, alt: "MillionStore Haiti" }],
   },
 };
 
@@ -47,11 +58,10 @@ export default function RootLayout({
     >
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#1a1a2e" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="MillionStore" />
-        <link rel="apple-touch-icon" href="https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-full flex flex-col">
         <InstallBanner />

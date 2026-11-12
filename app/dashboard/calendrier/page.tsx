@@ -153,6 +153,9 @@ export default function CalendrierPage() {
       : false);
   }, [user]);
   const allowedKey = allowed.join(",");
+  
+  // 🔒 Aksè nan paj la: admin oswa pèmisyon calendrierVoir
+  const canOpen = !!user && (user.isAdmin || user.permissions?.calendrierVoir === true);
 
   // ─── AUTH ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -175,7 +178,7 @@ export default function CalendrierPage() {
 
   // ─── DONNÉES EN DIRECT ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!user || !lid) return;
+    if (!user || !lid || !canOpen) return;
     setLoading(true); setArchive([]); setArchiveLoaded(false);
     const base = ["locals", lid] as const;
     const withId = (d: { id: string; data: () => Raw }) => ({ ...d.data(), id: d.id });
@@ -200,11 +203,11 @@ export default function CalendrierPage() {
       : noop;
     return () => { u1(); u2(); u3(); u4(); u5(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, lid, allowedKey]);
+}, [user, lid, allowedKey, canOpen]);
 
   // Anciens mouvements des vendeurs (+90 jours) — seulement si on regarde un vieux mois
   useEffect(() => {
-    if (!user || !lid || archiveLoaded || vendeurs.length === 0 || !allowed.includes("vendeur")) return;
+    if (!user || !lid || !canOpen || archiveLoaded || vendeurs.length === 0 || !allowed.includes("vendeur")) return;
     const limit = Date.now() - 80 * 86400000;
     if (month.getTime() >= limit) return;
     setArchiveLoaded(true);
@@ -339,6 +342,25 @@ export default function CalendrierPage() {
   const goToday = () => setMonth(new Date(now.getFullYear(), now.getMonth(), 1));
 
   if (!user) return null;
+
+  
+  if (!canOpen) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0F1117", fontFamily: "'Segoe UI',sans-serif",
+        color: "#fff", display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 14, padding: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 54 }}>🔒</div>
+        <p style={{ color: "#aaa", margin: 0 }}>
+          Vous n&apos;avez pas la permission de voir le calendrier.
+        </p>
+        <button onClick={() => router.push("/dashboard")}
+          style={{ background: ORANGE, border: "none", color: "#fff", borderRadius: 12,
+            padding: "10px 20px", cursor: "pointer", fontWeight: 700, fontFamily: "inherit" }}>
+          ← Retour
+        </button>
+      </main>
+    );
+  }
 
   const lead = (new Date(month.getFullYear(), month.getMonth(), 1).getDay() + 6) % 7; // lundi = 0
   const todayKey = keyOf(new Date());

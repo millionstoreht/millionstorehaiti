@@ -82,7 +82,10 @@ export const DEFAULT_LOCAL_ID = "1773629612385";
 export const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   produitVoir: false, produitAjoute: false, produitModifye: false, produitSiprime: false, produitChangePrix: false, produitVoirStockVid: false,
   commandeVoir: false, commandeConfirme: false, commandeLivraison: false, commandeLivre: false, commandeAnile: false, commandeSiprime: false,
-  studioVoir: false,
+  studioVoir: false,   calendrierVoir: false, calculatriceVoir: false,
+  livreurVoir: false, livreurAjoute: false, livreurModifye: false, livreurDepot: false, livreurRetrait: false, livreurSiprime: false,
+  controlVoir: false, rapportageVoir: false, rapportageModifye: false, rapportageSiprime: false,
+  informationVoir: true, informationAjoute: false, informationModifye: false, informationSiprime: false,
   factureVoir: false, factureCreye: false, factureVoirIstwa: false, factureAnile: false, factureSiprime: false, factureModifye: false,
   clientVoir: false, clientAjoute: false, clientModifye: false, clientSiprime: false,
   rapportVoir: false, rapportEksporte: false, rapportAnile: false, rapportSiprime: false,

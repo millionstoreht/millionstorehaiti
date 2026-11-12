@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "../../../lib/firebase";
+import { db, auth } from "../../../lib/firebase";
+import {
+  EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential, type User,
+} from "firebase/auth";
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from "firebase/firestore";
@@ -54,6 +57,9 @@ interface HistEntry {
   produitDescription?: string;
   venteDate?: string;
   opId?: string;
+  par?: string; note?: string;
+  factureId?: string; ventId?: string; productId?: string;
+  commission?: number; benefis?: number; qty?: number;
   soldeApres?: number; // kalkile sou ekran, pa estoke
 }
 
@@ -99,11 +105,62 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/** Nettoie la note : espaces doubles retirés, 200 caractères maximum. */
+const cleanNote = (raw: string) => raw.replace(/\s+/g, " ").trim().slice(0, 200);
+
+/** ID long → version courte pour l'affichage (8 derniers caractères). */
+const shortId = (raw?: string) => {
+  const t = (raw ?? "").toString().trim();
+  return t.length <= 10 ? t : `…${t.slice(-8)}`;
+};
+
+/** Est-ce que [x] est la vente cherchée ? (billNo n'est JAMAIS une clé pour les données nouvelles)
+ *  1) ventId si les deux côtés en ont un ; 2) sinon factureId + id produit ;
+ *  3) anciennes données sans factureId : billNo + id produit. */
+function memeVente(x: Vente, t: Vente): boolean {
+  const s = (v: unknown) => (v ?? "").toString().trim();
+  const xVent = s(x.ventId), tVent = s(t.ventId);
+  if (xVent && tVent) return xVent === tVent;
+  const xProd = s(x.id), tProd = s(t.id);
+  if (!xProd || !tProd || xProd !== tProd) return false;
+  const xFact = s(x.factureId), tFact = s(t.factureId);
+  if (xFact && tFact) return xFact === tFact;
+  const xBill = s(x.billNo), tBill = s(t.billNo);
+  return !!xBill && !!tBill && xBill === tBill;
+}
+
+// ─── VÉRIFICATION DU MOT DE PASSE ────────────────────────────────────────────
+function currentAuthUser(): Promise<User | null> {
+  return new Promise(resolve => {
+    if (auth.currentUser) { resolve(auth.currentUser); return; }
+    const off = onAuthStateChanged(auth, u => { off(); resolve(u); });
+  });
+}
+
+async function verifyPassword(pw: string): Promise<{ ok: boolean; message?: string }> {
+  const u = await currentAuthUser();
+  if (!u || !u.email) return { ok: false, message: "Session expirée. Reconnectez-vous." };
+  try {
+    await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, pw));
+    return { ok: true };
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+      return { ok: false, message: "Mot de passe incorrect" };
+    }
+    if (code === "auth/too-many-requests") {
+      return { ok: false, message: "Trop de tentatives. Réessayez dans quelques minutes." };
+    }
+    return { ok: false, message: "Vérification impossible. Réessayez." };
+  }
+}
+
 function histEntry(opts: {
   type: string; montant: number; description: string;
   venteId?: string; marque?: string; modele?: string; billNo?: string;
   clientNom?: string; cashier?: string; produitDescription?: string;
   venteDate?: string; opId?: string;
+  factureId?: string; ventId?: string; productId?: string; par?: string; note?: string;
 }): HistEntry {
   const e: HistEntry = {
     type: opts.type, date: new Date().toISOString(),
@@ -118,19 +175,24 @@ function histEntry(opts: {
   if (opts.produitDescription) e.produitDescription = opts.produitDescription;
   if (opts.venteDate) e.venteDate = opts.venteDate;
   if (opts.opId) e.opId = opts.opId;
+  if (opts.factureId) e.factureId = opts.factureId;
+  if (opts.ventId) e.ventId = opts.ventId;
+  if (opts.productId) e.productId = opts.productId;
+  if (opts.par) e.par = opts.par;
+  if (opts.note) e.note = opts.note;
   return e;
 }
 
 /** Disponib = balans - sa ki poko gen 15 jou.
- *  Vant ak restorasyon konte depi dat yo. Annilasyon / siprime konte depi
- *  dat vant orijinal la (venteDate). Retrait ak Dépôt konte touswit. */
+ *  Vant, restorasyon ak dépôt konte depi dat yo. Annilasyon / siprime konte depi
+ *  dat vant orijinal la (venteDate). Retrait konte touswit. (Menm règ ak app Flutter la.) */
 function calcDispo(v: { balance?: number; historique?: HistEntry[] }) {
   const balance = Number(v.balance ?? 0);
   const now = Date.now();
   let enAttente = 0;
   for (const e of v.historique ?? []) {
     const t = e.type;
-    if (t !== "vente" && t !== "restauration" && t !== "annulation" && t !== "suppression_definitive") continue;
+    if (t !== "vente" && t !== "restauration" && t !== "depot" && t !== "annulation" && t !== "suppression_definitive") continue;
     const montant = Number(e.montant ?? 0);
     const isReverse = t === "annulation" || t === "suppression_definitive";
     const ref = isReverse ? (e.venteDate ?? e.date) : e.date;
@@ -286,6 +348,12 @@ export default function VendeursPage() {
     finally { busyRef.current = false; setBusy(false); }
   }
 
+  // ─── PERMISSIONS (admin a tous les droits) ───────────────────────────────
+  const canDepot = !!user && (user.isAdmin || user.permissions?.vendeurDepot === true);
+  const canRetrait = !!user && (user.isAdmin || user.permissions?.vendeurRetrait === true);
+  const canAnnuler = !!user && (user.isAdmin || user.permissions?.vendeurAnnuler === true);
+  const actor = ((user?.username ?? "").trim() || (user?.displayName ?? "").trim());
+
   // ─── AUTH ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const raw = localStorage.getItem("ms_web_user");
@@ -401,7 +469,12 @@ export default function VendeursPage() {
 
   /** Retrait / Dépôt. opId inik: si w reeseye apre yon koupe rezo, menm
    *  operasyon an pa ekri de fwa. Retrè verifye "disponib" andedan tranzaksyon an. */
-  const mouvementVendeur = async (v: Vendeur, montantBrut: number, retrait: boolean, opId: string) => {
+  const mouvementVendeur = async (v: Vendeur, montantBrut: number, retrait: boolean, opId: string, note: string) => {
+    if (retrait ? !canRetrait : !canDepot) {
+      snack("⛔ Vous n'avez pas la permission de faire un " + (retrait ? "retrait" : "dépôt") + ".", "red");
+      return;
+    }
+    if (!actor) { snack("Utilisateur introuvable. Reconnectez-vous.", "red"); return; }
     const m = r2(montantBrut);
     const lid = v.localId ?? localId;
     const ref = doc(db, "locals", lid, "vendeurs", v.id);
@@ -423,8 +496,8 @@ export default function VendeursPage() {
           hist.push(histEntry({
             type: retrait ? "retrait" : "depot",
             montant: retrait ? -m : m,
-            description: retrait ? "Retrait effectué" : "Dépôt effectué par l'admin",
-            opId,
+            description: retrait ? `Retrait effectué par ${actor}` : `Dépôt effectué par ${actor}`,
+            opId, par: actor, note,
           }));
           tx.update(ref, { balance: r2(bal + (retrait ? -m : m)), historique: hist });
         }), 12000);
@@ -474,7 +547,9 @@ export default function VendeursPage() {
 
   /** Siprime yon vant DEFINITIF. Matching pa ventId. Bloke si vandè a deja
    *  retire kòb la (disponib ta vin negatif). Trase: venteDate nan relevé. */
-  const doSiprimeVente = async (v: Vendeur, t: Vente) => {
+  const doSiprimeVente = async (v: Vendeur, t: Vente, note: string) => {
+    if (!canAnnuler) { snack("⛔ Vous n'avez pas la permission d'annuler une vente.", "red"); return; }
+    if (!actor) { snack("Utilisateur introuvable. Reconnectez-vous.", "red"); return; }
     const lid = v.localId ?? localId;
     const ref = doc(db, "locals", lid, "vendeurs", v.id);
     return guard(async () => {
@@ -484,10 +559,7 @@ export default function VendeursPage() {
           if (!snap.exists()) throw new Error("Vendeur introuvable");
           const current = snap.data() as Vendeur;
           const ventes = [...(current.ventes ?? [])];
-          const idx = ventes.findIndex(x =>
-            t.ventId ? x.ventId === t.ventId
-            : (x.id === t.id && (t.factureId ? x.factureId === t.factureId : x.billNo === t.billNo))
-          );
+          const idx = ventes.findIndex(x => memeVente(x, t));
           if (idx === -1) throw new Error("Vente introuvable (déjà retirée ?)");
           const gain = Number(ventes[idx].gainTotal ?? 0);
           const currentBalance = Number(current.balance ?? 0);
@@ -496,12 +568,16 @@ export default function VendeursPage() {
           ventes.splice(idx, 1);
           const historique = [...(current.historique ?? []), histEntry({
             type: "suppression_definitive", montant: -gain,
-            description: "Retrait — produit retiré définitivement",
+            description: `Vente annulée par ${actor} — produit retiré définitivement`,
             venteId: (removed.id ?? "").toString(), marque: removed.marque,
             modele: removed.modele ?? removed.model,
             billNo: (removed.billNo ?? "").toString(), clientNom: removed.clientNom,
             cashier: removed.cashier, produitDescription: removed.description,
             venteDate: removed.date,
+            factureId: (removed.factureId ?? t.factureId ?? "").toString(),
+            ventId: (removed.ventId ?? t.ventId ?? "").toString(),
+            productId: (removed.id ?? t.id ?? "").toString(),
+            par: actor, note,
           })];
           const updated = { ...current, ventes, balance: r2(currentBalance - gain), historique };
           const avantBrut = calcDispo(current).brut;
@@ -716,15 +792,17 @@ export default function VendeursPage() {
                         ${v.balance.toFixed(2)}
                       </p>
                       <p style={{ margin:0, color:"#666", fontSize:10 }}>dispo ${dispo.toFixed(2)}</p>
-                      {user.isAdmin && (
+                      {(canDepot || (canRetrait && dispo > 0)) && (
                         <div style={{ display:"flex", gap:4, marginTop:4, justifyContent:"flex-end" }}>
+                          {canDepot && (
                           <button disabled={busy} onClick={e => { e.stopPropagation(); setShowDepotModal(v); }}
                             style={{ background:"rgba(41,121,255,0.2)", border:"none",
                               color:"#2979FF", padding:"2px 8px", borderRadius:8,
                               cursor:"pointer", fontSize:10, fontWeight:700 }}>
                             Dépôt
                           </button>
-                          {dispo > 0 && (
+                          )}
+                          {canRetrait && dispo > 0 && (
                             <button disabled={busy} onClick={e => { e.stopPropagation(); setShowRetraitModal(v); }}
                               style={{ background:"rgba(0,200,83,0.2)", border:"none",
                                 color:"#00C853", padding:"2px 8px", borderRadius:8,
@@ -881,7 +959,7 @@ export default function VendeursPage() {
               <div style={{ height:1, background:"#ffffff11" }}/>
               <div style={{ overflowY:"auto", flex:1, padding:"12px 16px" }}>
                 {active.length === 0 ? (
-                  <p style={{ textAlign:"center", color:"#444", marginTop:40 }}>Pa gen vant toujou</p>
+                  <p style={{ textAlign:"center", color:"#444", marginTop:40 }}>Aucune vente pour le moment</p>
                 ) : (
                   [...active].reverse().map((t,i) => {
                     const kom = Number(t.commission??0);
@@ -918,7 +996,7 @@ export default function VendeursPage() {
                               </span>
                             )}
                             <span style={{ color, fontWeight:700, fontSize:13 }}>${(kom+ben).toFixed(2)}</span>
-                            {user.isAdmin && (
+                            {canAnnuler && (
                               <button onClick={() => setShowSiprimeConfirm({v,t})} disabled={busy}
                                 style={{ background:"rgba(255,0,0,0.15)", border:"none",
                                   color: busy ? "#666" : "#ff4444", width:24, height:24, borderRadius:"50%",
@@ -930,6 +1008,14 @@ export default function VendeursPage() {
                           </div>
                         </div>
                         {cat && <p style={{ margin:"0 0 4px", color:"#00BCD4", fontSize:11 }}>📦 {cat}</p>}
+                        {t.factureId && (
+                          <p style={{ margin:"0 0 4px" }}>
+                            <span style={{ background:"#40C4FF22", color:"#40C4FF", fontSize:10,
+                              padding:"2px 6px", borderRadius:6, fontWeight:700 }}>
+                              Facture : {shortId(t.factureId)}
+                            </span>
+                          </p>
+                        )}
                         <p style={{ margin:"0 0 4px", color:"#444", fontSize:10 }}>
                           🕐 {fmt(t.date)} &nbsp;&nbsp; 🧾 N° {t.billNo ?? ""} &nbsp;&nbsp; Qté : {qty}
                         </p>
@@ -986,16 +1072,16 @@ export default function VendeursPage() {
 
       {/* ═══════════════ MODAL: RETRAIT ═══════════════ */}
       {showRetraitModal && (
-        <MouvementModal retrait v={showRetraitModal} busy={busy}
+        <MouvementModal retrait v={showRetraitModal} busy={busy} actor={actor} notify={snack}
           onClose={() => setShowRetraitModal(null)}
-          onConfirm={(m, opId) => mouvementVendeur(showRetraitModal, m, true, opId)} />
+          onConfirm={(m, opId, note) => mouvementVendeur(showRetraitModal, m, true, opId, note)} />
       )}
 
       {/* ═══════════════ MODAL: DÉPÔT ═══════════════ */}
       {showDepotModal && (
-        <MouvementModal retrait={false} v={showDepotModal} busy={busy}
+        <MouvementModal retrait={false} v={showDepotModal} busy={busy} actor={actor} notify={snack}
           onClose={() => setShowDepotModal(null)}
-          onConfirm={(m, opId) => mouvementVendeur(showDepotModal, m, false, opId)} />
+          onConfirm={(m, opId, note) => mouvementVendeur(showDepotModal, m, false, opId, note)} />
       )}
 
       {/* ═══════════════ MODAL: TÉLÉPHONE ═══════════════ */}
@@ -1010,10 +1096,10 @@ export default function VendeursPage() {
         <SiprimeConfirmModal
           marque={showSiprimeConfirm.t.marque}
           modele={showSiprimeConfirm.t.modele ?? showSiprimeConfirm.t.model}
-          busy={busy}
+          busy={busy} actor={actor} notify={snack}
           onClose={() => setShowSiprimeConfirm(null)}
-          onConfirm={async () => {
-            await doSiprimeVente(showSiprimeConfirm.v, showSiprimeConfirm.t);
+          onConfirm={async (note) => {
+            await doSiprimeVente(showSiprimeConfirm.v, showSiprimeConfirm.t, note);
             setShowSiprimeConfirm(null);
           }}
         />
@@ -1118,11 +1204,20 @@ function ReleveModal({ v, color, fallbackLocalId, onClose }: {
           </span>
         </div>
         <p style={{ margin:"0 0 8px", color:"#999", fontSize:11, lineHeight:1.4 }}>{phrase}</p>
-        {(l.marque || l.modele || l.venteId || l.billNo) && (
+        {(l.marque || l.modele || l.venteId || l.billNo || l.factureId) && (
           <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:6 }}>
             {(l.marque || l.modele) && <Badge text={`${l.marque ?? ""} ${l.modele ?? ""}`.trim()} c="#aaaaaa"/>}
             {l.venteId && <Badge text={`ID : ${l.venteId}`} c="#555555"/>}
             {l.billNo && <Badge text={`N° ${l.billNo}`} c="#555555"/>}
+            {l.factureId && <Badge text={`Facture : ${shortId(l.factureId)}`} c="#40C4FF"/>}
+            {l.ventId && <Badge text={`Vente : ${shortId(l.ventId)}`} c="#444444"/>}
+            {l.qty != null && <Badge text={`Qté : ${l.qty}`} c="#555555"/>}
+          </div>
+        )}
+        {(l.par || l.note) && (
+          <div style={{ marginBottom:6 }}>
+            {l.par && <Badge text={`Par : ${l.par}`} c="#448AFF"/>}
+            {l.note && <p style={{ margin:"6px 0 0", color:"#888", fontSize:11, fontStyle:"italic" }}>📝 {l.note}</p>}
           </div>
         )}
         {(l.produitDescription || l.clientNom || l.cashier) && (
@@ -1130,6 +1225,14 @@ function ReleveModal({ v, color, fallbackLocalId, onClose }: {
             {l.produitDescription && <Badge text={l.produitDescription} c="#555555"/>}
             {l.clientNom && <Badge text={`Client : ${l.clientNom}`} c="#26c6da"/>}
             {l.cashier && <Badge text={`Caissier : ${l.cashier}`} c="#42a5f5"/>}
+          </div>
+        )}
+        {(l.benefis != null || l.commission != null) && (
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:6 }}>
+            {l.benefis != null && <Badge text={`Bén : $${Number(l.benefis).toFixed(2)}`} c="#4CAF50"/>}
+            {l.commission != null && <Badge text={`Com : $${Number(l.commission).toFixed(2)}`} c="#FF9800"/>}
+            {l.benefis != null && l.commission != null &&
+              <Badge text={`Total : $${(Number(l.benefis) + Number(l.commission)).toFixed(2)}`} c={color}/>}
           </div>
         )}
         {!isArchive && (
@@ -1216,6 +1319,7 @@ function AlerteVente({ alerte, balance, nbAlertes }: { alerte: HistEntry; balanc
     (marque || modele) ? `${marque} ${modele}`.trim() : null,
     alerte.venteId ? `ID : ${alerte.venteId}` : null,
     alerte.billNo ? `N° ${alerte.billNo}` : null,
+    alerte.factureId ? `Facture ${shortId(alerte.factureId)}` : null,
   ].filter(Boolean).join(" • ");
 
   return (
@@ -1247,20 +1351,76 @@ function AlerteVente({ alerte, balance, nbAlertes }: { alerte: HistEntry; balanc
   );
 }
 
-function SiprimeConfirmModal({ marque, modele, busy, onClose, onConfirm }: {
-  marque?: string; modele?: string; busy: boolean; onClose: () => void; onConfirm: () => void;
+/** Champs communs : nom d'utilisateur + mot de passe + note, avec vérification. */
+function useCredentials(actor: string, notify: (m: string, c: string) => void, onTooMany: () => void) {
+  const [userVal, setUserVal] = useState("");
+  const [pass, setPass] = useState("");
+  const [note, setNote] = useState("");
+  const [errUser, setErrUser] = useState<string | null>(null);
+  const [errPass, setErrPass] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [essais, setEssais] = useState(0);
+
+  /** Retourne true si le nom d'utilisateur et le mot de passe sont corrects. */
+  const verify = async (): Promise<boolean> => {
+    const typed = userVal.trim();
+    if (!typed) { setErrUser("Nom d'utilisateur obligatoire"); return false; }
+    if (typed.toLowerCase() !== actor.toLowerCase()) { setErrUser("Nom d'utilisateur incorrect"); return false; }
+    if (!pass) { setErrPass("Mot de passe obligatoire"); return false; }
+    setVerifying(true);
+    const r = await verifyPassword(pass);
+    setVerifying(false);
+    if (r.ok) return true;
+    const n = essais + 1;
+    setEssais(n);
+    if (n >= 5) { onTooMany(); notify("Trop de tentatives. Action annulée.", "red"); return false; }
+    setErrPass(r.message ?? "Mot de passe incorrect");
+    return false;
+  };
+
+  const fields = (disabled: boolean, onEnter?: () => void) => (
+    <>
+      <input value={userVal} disabled={disabled} autoComplete="off" spellCheck={false}
+        onChange={e => { setUserVal(e.target.value); setErrUser(null); }}
+        placeholder="Votre nom d'utilisateur (obligatoire)" style={{ ...inputStyle, marginTop:10 }} />
+      {errUser && <p style={{ color:"#ff4444", fontSize:12, margin:"6px 0 0" }}>{errUser}</p>}
+      <input type="password" value={pass} disabled={disabled} autoComplete="new-password"
+        onChange={e => { setPass(e.target.value); setErrPass(null); }}
+        onKeyDown={e => { if (e.key === "Enter" && onEnter) onEnter(); }}
+        placeholder="Mot de passe (obligatoire)" style={{ ...inputStyle, marginTop:10 }} />
+      {errPass && <p style={{ color:"#ff4444", fontSize:12, margin:"6px 0 0" }}>{errPass}</p>}
+      <textarea value={note} disabled={disabled} maxLength={200} rows={2}
+        onChange={e => setNote(e.target.value)} placeholder="Note (optionnel)"
+        style={{ ...inputStyle, marginTop:10, resize:"vertical" }} />
+    </>
+  );
+
+  return { verify, verifying, note: cleanNote(note), fields };
+}
+
+function SiprimeConfirmModal({ marque, modele, busy, actor, notify, onClose, onConfirm }: {
+  marque?: string; modele?: string; busy: boolean; actor: string;
+  notify: (m: string, c: string) => void;
+  onClose: () => void; onConfirm: (note: string) => void;
 }) {
+  const cred = useCredentials(actor, notify, onClose);
+  const lock = busy || cred.verifying;
+  const submit = async () => {
+    if (lock) return;
+    if (await cred.verify()) onConfirm(cred.note);
+  };
   return (
-    <Modal title="Siprime Definitif ?" onClose={onClose}>
-      <p style={{ color:"#888", margin:"0 0 16px", lineHeight:1.5 }}>
+    <Modal title="Siprime Definitif ?" onClose={lock ? () => {} : onClose}>
+      <p style={{ color:"#888", margin:"0 0 6px", lineHeight:1.5 }}>
         {marque} {modele} ap retire definitivman nan kont vandè sa a.
         <br/><br/>
         Aksyon sa a PA KA anile.
       </p>
-      <div style={{ display:"flex", gap:8 }}>
-        <button onClick={onClose} style={btnSecondary}>Non</button>
-        <button onClick={onConfirm} disabled={busy} style={btnPrimary("#ff4444")}>
-          {busy ? "..." : "Wi, Siprime"}
+      {cred.fields(lock, submit)}
+      <div style={{ display:"flex", gap:8, marginTop:16 }}>
+        <button onClick={onClose} disabled={lock} style={btnSecondary}>Non</button>
+        <button onClick={submit} disabled={lock} style={btnPrimary("#ff4444")}>
+          {cred.verifying ? "Vérification..." : busy ? "..." : "Wi, Siprime"}
         </button>
       </div>
     </Modal>
@@ -1276,32 +1436,37 @@ function Badge({ text, c }: { text: string; c: string }) {
 
 /** Retrait ak Dépôt nan yon sèl modal. opId kreye yon fwa lè modal la louvri:
  *  si w reeseye nan menm modal la, menm operasyon an pa ekri de fwa. */
-function MouvementModal({ v, retrait, busy, onClose, onConfirm }: {
-  v: Vendeur; retrait: boolean; busy: boolean; onClose: () => void;
-  onConfirm: (montant: number, opId: string) => void;
+function MouvementModal({ v, retrait, busy, actor, notify, onClose, onConfirm }: {
+  v: Vendeur; retrait: boolean; busy: boolean; actor: string;
+  notify: (m: string, c: string) => void;
+  onClose: () => void;
+  onConfirm: (montant: number, opId: string, note: string) => void;
 }) {
   const [val, setVal] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [opId] = useState(() => `${Date.now()}${Math.floor(Math.random() * 1e6)}`);
   const calc = calcDispo(v);
+  const cred = useCredentials(actor, notify, onClose);
+  const lock = busy || cred.verifying;
 
-  const submit = () => {
-    if (busy) return;
+  const submit = async () => {
+    if (lock) return;
     const m = parseFloat(val.replace(",", "."));
     if (isNaN(m) || m <= 0) { setErr("Montant invalide"); return; }
     if (m > 1000000) { setErr("Montant trop élevé"); return; }
     if (retrait && m > calc.disponible + 0.001) {
       setErr(`Dépasse le disponible ($${calc.disponible.toFixed(2)})`); return;
     }
-    onConfirm(m, opId);
+    if (!(await cred.verify())) return;
+    onConfirm(r2(m), opId, cred.note);
   };
 
   return (
-    <Modal title={retrait ? "Retrait" : "Dépôt"} onClose={busy ? () => {} : onClose}>
+    <Modal title={retrait ? "Retrait" : "Dépôt"} onClose={lock ? () => {} : onClose}>
       <p style={{ color:"#888", margin:"0 0 6px", fontSize:13 }}>
         Solde de {v.nom} : ${v.balance.toFixed(2)}
       </p>
-      {retrait && (
+      {retrait ? (
         <>
           <p style={{ color:"#00C853", margin:"0 0 2px", fontSize:13, fontWeight:700 }}>
             Disponible (15 jours+) : ${calc.disponible.toFixed(2)}
@@ -1310,16 +1475,21 @@ function MouvementModal({ v, retrait, busy, onClose, onConfirm }: {
             En attente (&lt; 15 jours) : ${calc.enAttente.toFixed(2)}
           </p>
         </>
+      ) : (
+        <p style={{ color:"#ffab40", margin:"0 0 10px", fontSize:12 }}>
+          Ce dépôt sera en attente pendant 15 jours avant d&apos;être disponible.
+        </p>
       )}
-      <input type="number" step="0.01" value={val} autoFocus disabled={busy}
+      <input type="number" step="0.01" value={val} autoFocus disabled={lock}
         onChange={e => { setVal(e.target.value); setErr(null); }}
         onKeyDown={e => { if (e.key === "Enter") submit(); }}
         placeholder={retrait ? "Montant du retrait" : "Montant du dépôt"} style={inputStyle} />
       {err && <p style={{ color:"#ff4444", fontSize:12, margin:"6px 0 0" }}>{err}</p>}
+      {cred.fields(lock, submit)}
       <div style={{ display:"flex", gap:8, marginTop:16 }}>
-        <button onClick={onClose} disabled={busy} style={btnSecondary}>Annuler</button>
-        <button onClick={submit} disabled={busy} style={btnPrimary(retrait ? "#00C853" : "#2979FF")}>
-          {busy ? "..." : "Confirmer"}
+        <button onClick={onClose} disabled={lock} style={btnSecondary}>Annuler</button>
+        <button onClick={submit} disabled={lock} style={btnPrimary(retrait ? "#00C853" : "#2979FF")}>
+          {cred.verifying ? "Vérification..." : busy ? "..." : "Confirmer"}
         </button>
       </div>
     </Modal>

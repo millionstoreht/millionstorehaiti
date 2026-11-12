@@ -3,6 +3,20 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { db } from "../lib/firebase";
 import { collectionGroup, onSnapshot, query, doc, getDoc, updateDoc, increment, collection, addDoc } from "firebase/firestore";
 
+// ─── BRAND (koulè logo a) ────────────────────────────────────────────────────
+const B = {
+  navy: "#0a2a7a",
+  blue: "#1565d8",
+  sky: "#0ea5ff",
+  green: "#1fb85a",
+  red: "#e63946",
+  bg: "#f2f6fd",
+  border: "#e3ebfa",
+  text: "#0f1b3d",
+};
+const GRAD = `linear-gradient(135deg, ${B.navy} 0%, ${B.blue} 100%)`;
+const GRAD_ACCENT = `linear-gradient(90deg, ${B.blue}, ${B.sky}, ${B.green})`;
+
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 interface Product {
   id: string;
@@ -140,11 +154,11 @@ function GoogleLoginModal({ onClose, onSuccess }: {
   }, []);
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "24px", width: "100%", maxWidth: "360px", padding: "32px 24px", textAlign: "center" }}>
-        <div style={{ fontSize: "48px", marginBottom: "8px" }}>🛒</div>
-        <h2 style={{ margin: "0 0 6px", fontSize: "20px", fontWeight: 900, color: "#1a1a2e" }}>Konekte pou achte</h2>
-        <p style={{ margin: "0 0 24px", fontSize: "13px", color: "#888", lineHeight: 1.5 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.7)", zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "24px", width: "100%", maxWidth: "360px", padding: "32px 24px", textAlign: "center", boxShadow: "0 20px 60px rgba(10,42,122,0.35)" }}>
+        <img src="/logo-icon.png" alt="MillionStore" style={{ width: "76px", height: "76px", objectFit: "contain", marginBottom: "8px" }} />
+        <h2 style={{ margin: "0 0 6px", fontSize: "20px", fontWeight: 900, color: B.navy }}>Konekte pou achte</h2>
+        <p style={{ margin: "0 0 24px", fontSize: "13px", color: "#7a859e", lineHeight: 1.5 }}>
           Itilize kont Google ou pou kontinye achte nan MillionStore
         </p>
         {error && (
@@ -199,7 +213,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
 
   const METHOD_COLORS: Record<string, string> = { moncash: "#E8011A", natcash: "#004B87", bank: "#1D5F2B" };
   const METHOD_LABELS: Record<string, string> = { moncash: "MonCash", natcash: "NatCash", bank: "Virement Bancaire" };
-  const activeColor = step !== "choose" && step !== "confirm" ? METHOD_COLORS[step] : "#1a1a2e";
+  const activeColor = step !== "choose" && step !== "confirm" ? METHOD_COLORS[step] : B.navy;
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -255,50 +269,50 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 3000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", padding: "24px", maxHeight: "92vh", overflow: "auto" }}>
-        <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 20px" }} />
-        <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#f1f1f1", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer" }}>×</button>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.65)", zIndex: 3000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "22px 22px 0 0", width: "100%", maxWidth: "500px", padding: "24px", maxHeight: "92vh", overflow: "auto" }}>
+        <div style={{ width: "40px", height: "4px", background: "#d6e0f5", borderRadius: "2px", margin: "0 auto 20px" }} />
+        <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#eef3fd", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer", color: B.navy }}>×</button>
 
         {step === "choose" && (
           <>
             <div style={{ textAlign: "center", marginBottom: "20px" }}>
-              <p style={{ margin: "0 0 4px", fontSize: "13px", color: "#888" }}>Total à payer</p>
-              <p style={{ margin: 0, fontSize: "32px", fontWeight: 800, color: "#111" }}>${Number(total).toLocaleString()}</p>
+              <p style={{ margin: "0 0 4px", fontSize: "13px", color: "#7a859e" }}>Total à payer</p>
+              <p style={{ margin: 0, fontSize: "32px", fontWeight: 800, color: B.navy }}>${Number(total).toLocaleString()}</p>
               {taux > 1 && (
-  <p style={{ margin: "4px 0 0", fontSize: "15px", fontWeight: 700, color: "#0984E3" }}>≈ {formatHTG(Number(total), taux)}</p>
+  <p style={{ margin: "4px 0 0", fontSize: "15px", fontWeight: 700, color: B.sky }}>≈ {formatHTG(Number(total), taux)}</p>
 )}
-              <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#888" }}>{orderLabel}</p>
+              <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#7a859e" }}>{orderLabel}</p>
             </div>
             {isMulti && (
-              <div style={{ background: "#f8f9ff", borderRadius: "10px", padding: "10px 12px", marginBottom: "12px" }}>
+              <div style={{ background: "#f3f7ff", borderRadius: "10px", padding: "10px 12px", marginBottom: "12px" }}>
                 {checkoutItems.map((item, i) => (
                   <p key={`${item.id}-${i}`} style={{ margin: "0 0 4px", fontSize: "12px", color: "#555" }}>• {item.marque} {item.modele} - ${Number(item.prixVente).toLocaleString()}</p>
                 ))}
               </div>
             )}
-            <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "0 0 16px" }} />
+            <hr style={{ border: "none", borderTop: `1px solid ${B.border}`, margin: "0 0 16px" }} />
 
-<p style={{ fontSize: "12px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Choisir méthode de paiement</p>
+<p style={{ fontSize: "12px", fontWeight: 700, color: "#7a859e", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Choisir méthode de paiement</p>
 {[
   { key: "moncash", label: "MonCash", sub: "Payer avec MonCash", color: "#E8011A", icon: "M" },
   { key: "natcash", label: "NatCash", sub: "Payer avec NatCash", color: "#004B87", icon: "N" },
   { key: "bank",    label: "Virement Bancaire", sub: "BNC, Sogebank, BUH, UNIBANK", color: "#1D5F2B", icon: "🏦" },
 ].map(({ key, label, sub, color, icon }) => (
-  <button key={key} onClick={() => setStep(key as any)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", borderRadius: "12px", border: "1px solid #eee", background: "#fff", cursor: "pointer", marginBottom: "10px", textAlign: "left" }}>
+  <button key={key} onClick={() => setStep(key as any)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", borderRadius: "14px", border: `1px solid ${B.border}`, background: "#fff", cursor: "pointer", marginBottom: "10px", textAlign: "left", boxShadow: "0 2px 8px rgba(10,42,122,0.05)" }}>
                 <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: "18px", flexShrink: 0 }}>{icon}</div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#111" }}>{label}</p>
-                  <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>{sub}</p>
+                  <p style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: B.text }}>{label}</p>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#7a859e" }}>{sub}</p>
                 </div>
-                <span style={{ fontSize: "20px", color: "#ccc" }}>›</span>
+                <span style={{ fontSize: "20px", color: "#c3cde3" }}>›</span>
               </button>
             ))}
-            <button onClick={() => setShowInfo(!showInfo)} style={{ width: "100%", padding: "12px", borderRadius: "12px", border: "1px dashed #cfd8dc", background: "#f8fbff", color: "#1a1a2e", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>
+            <button onClick={() => setShowInfo(!showInfo)} style={{ width: "100%", padding: "12px", borderRadius: "12px", border: `1px dashed ${B.sky}`, background: "#f3f9ff", color: B.navy, fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>
               ℹ️ Comment payer {showInfo ? "▲" : "▼"}
             </button>
             {showInfo && (
-              <div style={{ marginTop: "10px", background: "#f8f9ff", border: "1px solid #e5e9ff", borderRadius: "12px", padding: "12px 14px" }}>
+              <div style={{ marginTop: "10px", background: "#f3f7ff", border: `1px solid ${B.border}`, borderRadius: "12px", padding: "12px 14px" }}>
                 {["Choisissez la méthode (MonCash, NatCash, Banque).", "Effectuez le transfert au numéro/compte indiqué.", "Revenez cliquer sur Confirmer le paiement.", "Nous vérifions et vous contactons.", "Garantie complète — échange ou remboursement si problème."].map((t, i) => (
                   <p key={i} style={{ margin: "0 0 6px", fontSize: "13px", color: "#555" }}>{i + 1}) {t}</p>
                 ))}
@@ -309,18 +323,18 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
 
 {(step === "moncash" || step === "natcash") && (
           <>
-            <button onClick={() => setStep("choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#888", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
+            <button onClick={() => setStep("choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#7a859e", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
               <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: activeColor, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: "18px" }}>{step === "moncash" ? "M" : "N"}</div>
               <div>
-                <p style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111" }}>{METHOD_LABELS[step]}</p>
-                <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>Total: ${Number(total).toLocaleString()}</p>
+                <p style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: B.text }}>{METHOD_LABELS[step]}</p>
+                <p style={{ margin: 0, fontSize: "12px", color: "#7a859e" }}>Total: ${Number(total).toLocaleString()}</p>
               </div>
             </div>
-            <div style={{ background: "#fafafa", borderRadius: "12px", padding: "14px", marginBottom: "16px" }}>
-              <p style={{ fontSize: "13px", color: "#888", margin: "0 0 4px" }}>Envoyer au numéro:</p>
-              <p style={{ fontSize: "20px", fontWeight: 800, color: "#111", margin: 0, letterSpacing: "1px" }}>{step === "moncash" ? moncashNum : natcashNum}</p>
-              <p style={{ fontSize: "12px", color: "#888", margin: "6px 0 0" }}>Nom: {step === "moncash" ? moncashNom : natcashNom}</p>
+            <div style={{ background: "#f6f9ff", borderRadius: "12px", padding: "14px", marginBottom: "16px", border: `1px solid ${B.border}` }}>
+              <p style={{ fontSize: "13px", color: "#7a859e", margin: "0 0 4px" }}>Envoyer au numéro:</p>
+              <p style={{ fontSize: "20px", fontWeight: 800, color: B.text, margin: 0, letterSpacing: "1px" }}>{step === "moncash" ? moncashNum : natcashNum}</p>
+              <p style={{ fontSize: "12px", color: "#7a859e", margin: "6px 0 0" }}>Nom: {step === "moncash" ? moncashNom : natcashNom}</p>
             </div>
             <button onClick={() => goToInfos(step as "moncash" | "natcash")} style={{ width: "100%", padding: "14px", background: activeColor, color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>Confirmer le paiement</button>
           </>
@@ -328,16 +342,16 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
 
         {step === "bank" && (
           <>
-            <button onClick={() => setStep("choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#888", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
+            <button onClick={() => setStep("choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#7a859e", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
               <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "#1D5F2B", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>🏦</div>
               <div>
-                <p style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111" }}>Virement Bancaire</p>
-                <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>Total: ${Number(total).toLocaleString()}</p>
+                <p style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: B.text }}>Virement Bancaire</p>
+                <p style={{ margin: 0, fontSize: "12px", color: "#7a859e" }}>Total: ${Number(total).toLocaleString()}</p>
               </div>
             </div>
-            <div style={{ background: "#fafafa", borderRadius: "12px", padding: "14px", marginBottom: "16px" }}>
-              <p style={{ fontSize: "12px", fontWeight: 700, color: "#888", textTransform: "uppercase", margin: "0 0 10px" }}>Informations bancaires</p>
+            <div style={{ background: "#f6f9ff", borderRadius: "12px", padding: "14px", marginBottom: "16px", border: `1px solid ${B.border}` }}>
+              <p style={{ fontSize: "12px", fontWeight: 700, color: "#7a859e", textTransform: "uppercase", margin: "0 0 10px" }}>Informations bancaires</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
                 {Object.keys(BANK_DETAILS).map((b) => (
                   <button key={b} onClick={() => setSelectedBank(b)} style={{ border: selectedBank === b ? "1px solid #1D5F2B" : "1px solid #ddd", background: selectedBank === b ? "#eaf6ed" : "#fff", color: selectedBank === b ? "#1D5F2B" : "#333", borderRadius: "999px", padding: "6px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>{b}</button>
@@ -345,8 +359,8 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
               </div>
               {[["Banque", selectedBank], ["Titulaire", bankHolder], ["Compte gourde", BANK_DETAILS[selectedBank]?.gourde], ["Compte dollar", BANK_DETAILS[selectedBank]?.dollar]].map(([label, val]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: "13px" }}>
-                  <span style={{ color: "#888" }}>{label}</span>
-                  <span style={{ fontWeight: 700, color: "#111" }}>{val}</span>
+                  <span style={{ color: "#7a859e" }}>{label}</span>
+                  <span style={{ fontWeight: 700, color: B.text }}>{val}</span>
                 </div>
               ))}
             </div>
@@ -356,36 +370,36 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
 
         {step === "infos" && (
           <>
-            <button onClick={() => setStep(pendingMethod ?? "choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#888", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
-            <p style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 800, color: "#111" }}>Vos informations</p>
-            <p style={{ margin: "0 0 20px", fontSize: "13px", color: "#888" }}>Ces informations nous permettent de vous contacter pour confirmer votre commande.</p>
+            <button onClick={() => setStep(pendingMethod ?? "choose")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#7a859e", padding: 0, marginBottom: "16px" }}>{"← Retour"}</button>
+            <p style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 800, color: B.navy }}>Vos informations</p>
+            <p style={{ margin: "0 0 20px", fontSize: "13px", color: "#7a859e" }}>Ces informations nous permettent de vous contacter pour confirmer votre commande.</p>
 
             {infosError && (
               <div style={{ background: "#fff0f0", color: "#e63946", padding: "10px 12px", borderRadius: "10px", fontSize: "12px", marginBottom: "14px" }}>⚠️ {infosError}</div>
             )}
 
-<p style={{ fontSize: "11px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Nom complet</p>
+<p style={{ fontSize: "11px", fontWeight: 700, color: "#7a859e", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Nom complet</p>
             <input
               type="text"
               value={nom}
               onChange={(e) => setNom(e.target.value)}
-              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #dbe5f7", fontSize: "14px", outline: "none", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit" }}
             />
 
-            <p style={{ fontSize: "11px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Numéro de téléphone</p>
+            <p style={{ fontSize: "11px", fontWeight: 700, color: "#7a859e", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Numéro de téléphone</p>
             <input
               type="tel"
               value={telephone}
               onChange={(e) => setTelephone(e.target.value)}
-              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #dbe5f7", fontSize: "14px", outline: "none", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit" }}
             />
 
-            <p style={{ fontSize: "11px", fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Adresse de livraison</p>
+            <p style={{ fontSize: "11px", fontWeight: 700, color: "#7a859e", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>Adresse de livraison</p>
             <input
               type="text"
               value={adresse}
               onChange={(e) => setAdresse(e.target.value)}
-              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", marginBottom: "20px", boxSizing: "border-box", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #dbe5f7", fontSize: "14px", outline: "none", marginBottom: "20px", boxSizing: "border-box", fontFamily: "inherit" }}
             />
             <button
               onClick={() => {
@@ -395,7 +409,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
                 }
                 if (pendingMethod) handleConfirm(pendingMethod);
               }}
-              style={{ width: "100%", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}
+              style={{ width: "100%", padding: "14px", background: GRAD, color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(21,101,216,0.3)" }}
             >
               Confirmer la commande
             </button>
@@ -407,7 +421,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
     <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "#fff3e0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: "32px" }}>
       ⏳
     </div>
-    <p style={{ fontSize: "20px", fontWeight: 800, color: "#111", margin: "0 0 8px" }}>
+    <p style={{ fontSize: "20px", fontWeight: 800, color: B.navy, margin: "0 0 8px" }}>
       Dépôt en attente!
     </p>
     <p style={{ fontSize: "14px", color: "#666", margin: "0 0 16px", lineHeight: 1.7 }}>
@@ -426,7 +440,7 @@ function PaymentModal({ product, products, onClose, onPaymentConfirmed, siteConf
       >
         💬 Contacter sur WhatsApp
       </button>
-      <a href="/mon-compte" style={{ display: "block", width: "100%", padding: "12px", background: "#f0f4ff", color: "#1a1a2e", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", textDecoration: "none", boxSizing: "border-box" }}>
+      <a href="/mon-compte" style={{ display: "block", width: "100%", padding: "12px", background: "#eaf1ff", color: B.navy, border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", textDecoration: "none", boxSizing: "border-box" }}>
         👤 Voir mes commandes
       </a>
     </div>
@@ -461,20 +475,20 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {}, taux = 1
   }, []);
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.6)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       {showPayment && <PaymentModal product={product} siteConfig={siteConfig} onClose={() => setShowPayment(false)} />}
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "600px", maxHeight: "92vh", overflow: "auto", padding: "24px" }}>
-        <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 16px" }} />
-        <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#f1f1f1", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer" }}>×</button>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "22px 22px 0 0", width: "100%", maxWidth: "600px", maxHeight: "92vh", overflow: "auto", padding: "24px" }}>
+        <div style={{ width: "40px", height: "4px", background: "#d6e0f5", borderRadius: "2px", margin: "0 auto 16px" }} />
+        <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#eef3fd", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer", color: B.navy }}>×</button>
 
         {/* Image */}
-        <div style={{ background: "#fafafa", borderRadius: "14px", height: "240px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px", overflow: "hidden" }}>
+        <div style={{ background: "linear-gradient(180deg,#f8fbff,#eef3fc)", borderRadius: "16px", height: "240px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px", overflow: "hidden" }}>
           <img src={imgs[imgIdx] ?? getFallbackImage(product)} alt={`${product.marque} ${product.modele}`} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
         </div>
         {imgs.length > 1 && (
           <div style={{ display: "flex", gap: "8px", marginBottom: "16px", overflowX: "auto" }}>
             {imgs.map((img, i) => (
-              <div key={i} onClick={() => setImgIdx(i)} style={{ width: "56px", height: "56px", borderRadius: "8px", border: i === imgIdx ? `2px solid ${color}` : "2px solid #eee", overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
+              <div key={i} onClick={() => setImgIdx(i)} style={{ width: "56px", height: "56px", borderRadius: "8px", border: i === imgIdx ? `2px solid ${B.blue}` : "2px solid #eee", overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
                 <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
             ))}
@@ -488,10 +502,10 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {}, taux = 1
     {getGradeLabel(product.grade)}
   </span>
 )}
-        <p style={{ margin: "6px 0 2px", color: "#aaa", fontSize: "11px" }}>🔖 ID: {product.id || "—"}</p>
+        <p style={{ margin: "6px 0 2px", color: "#9aa5bd", fontSize: "11px" }}>🔖 ID: {product.id || "—"}</p>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "8px 0 4px" }}>
           {logo && <img src={logo} alt={product.marque} style={{ height: "20px", objectFit: "contain" }} />}
-          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#111" }}>{product.marque} {product.modele}</h2>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: B.text }}>{product.marque} {product.modele}</h2>
         </div>
         {product.description && (
   <p style={{ color: "#555", fontSize: "14px", lineHeight: 1.6, margin: "8px 0" }}>
@@ -506,9 +520,9 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {}, taux = 1
     </p>
   </div>
 )}
-        <p style={{ fontSize: "32px", fontWeight: 800, color: "#111", margin: "8px 0 4px" }}>${Number(product.prixVente).toLocaleString()}</p>
+        <p style={{ fontSize: "32px", fontWeight: 800, color: B.navy, margin: "8px 0 4px" }}>${Number(product.prixVente).toLocaleString()}</p>
         {taux > 1 && (
-  <p style={{ margin: "0 0 8px", color: "#0984E3", fontWeight: 700, fontSize: "16px" }}>≈ {formatHTG(Number(product.prixVente), taux)}</p>
+  <p style={{ margin: "0 0 8px", color: B.sky, fontWeight: 700, fontSize: "16px" }}>≈ {formatHTG(Number(product.prixVente), taux)}</p>
 )}
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: product.stock <= 2 ? "#fff3e0" : "#e8f5e9", color: product.stock <= 2 ? "#e65100" : "#2e7d32", padding: "4px 12px", borderRadius: "999px", fontSize: "13px", fontWeight: 600, marginBottom: "20px" }}>
           {product.stock <= 2 ? `⚠️ Seulement ${product.stock} restant!` : `✅ ${product.stock} en stock`}
@@ -532,14 +546,15 @@ function ProductModal({ product, onClose, onAddToCart, siteConfig = {}, taux = 1
     setShowPayment(true);
   }}
   style={{
-    width: "100%", background: "#1a1a2e", color: "#fff",
+    width: "100%", background: GRAD, color: "#fff",
     border: "none", borderRadius: "12px", padding: "14px",
     fontSize: "16px", fontWeight: 700, cursor: "pointer", marginBottom: "10px",
+    boxShadow: "0 6px 16px rgba(21,101,216,0.3)",
   }}
 >
   🛒 Acheter maintenant
 </button>
-        <button onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/${whatsapp}`, "_blank", "noopener,noreferrer"); }} style={{ width: "100%", background: "#fff", color: "#1a1a2e", border: "2px solid #1a1a2e", borderRadius: "12px", padding: "12px", fontSize: "15px", fontWeight: 600, cursor: "pointer", marginBottom: "10px" }}>💬 Nous contacter</button>
+        <button onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/${whatsapp}`, "_blank", "noopener,noreferrer"); }} style={{ width: "100%", background: "#fff", color: B.navy, border: `2px solid ${B.blue}`, borderRadius: "12px", padding: "12px", fontSize: "15px", fontWeight: 600, cursor: "pointer", marginBottom: "10px" }}>💬 Nous contacter</button>
         <button onClick={(e) => { e.stopPropagation(); onAddToCart(product); onClose(); }} style={{ width: "100%", background: "#0b8457", color: "#fff", border: "none", borderRadius: "12px", padding: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>➕ Ajouter au panier</button>
       </div>
     </div>
@@ -559,13 +574,13 @@ function CartModal({ cart, onClose, onRemoveItem, onCheckout, onCheckoutAll, sit
     return () => { document.body.style.overflow = ""; };
   }, []);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 2600, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", maxHeight: "92vh", overflow: "auto", padding: "24px" }}>
-        <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 16px" }} />
-        <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#f1f1f1", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer" }}>×</button>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.6)", zIndex: 2600, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "22px 22px 0 0", width: "100%", maxWidth: "500px", maxHeight: "92vh", overflow: "auto", padding: "24px" }}>
+        <div style={{ width: "40px", height: "4px", background: "#d6e0f5", borderRadius: "2px", margin: "0 auto 16px" }} />
+        <button onClick={onClose} style={{ position: "absolute", top: "16px", right: "16px", background: "#eef3fd", border: "none", borderRadius: "50%", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer", color: B.navy }}>×</button>
         <p style={{ margin: "0 0 4px", color: "#0b8457", fontWeight: 800, fontSize: "18px" }}>Total: ${total.toLocaleString()}</p>
 {taux > 1 && (
-  <p style={{ margin: "0 0 16px", color: "#0984E3", fontWeight: 700, fontSize: "14px" }}>≈ {formatHTG(total, taux)}</p>
+  <p style={{ margin: "0 0 16px", color: B.sky, fontWeight: 700, fontSize: "14px" }}>≈ {formatHTG(total, taux)}</p>
 )}
         {cart.length === 0 ? (
           <p style={{ color: "#666", textAlign: "center", padding: "40px 0" }}>Panier vide. Ajoutez des produits!</p>
@@ -575,20 +590,20 @@ function CartModal({ cart, onClose, onRemoveItem, onCheckout, onCheckoutAll, sit
               const imgs = getImages(item);
               const thumb = imgs[0] ?? getFallbackImage(item);
               return (
-                <div key={`${item.id}-${index}`} style={{ border: "1px solid #ececec", borderRadius: "12px", padding: "12px", display: "grid", gridTemplateColumns: "70px 1fr", gap: "12px", alignItems: "center" }}>
-                  <img src={thumb} alt={`${item.marque} ${item.modele}`} style={{ width: "70px", height: "70px", objectFit: "contain", background: "#fafafa", borderRadius: "10px", padding: "6px" }} />
+                <div key={`${item.id}-${index}`} style={{ border: `1px solid ${B.border}`, borderRadius: "14px", padding: "12px", display: "grid", gridTemplateColumns: "70px 1fr", gap: "12px", alignItems: "center", boxShadow: "0 2px 8px rgba(10,42,122,0.05)" }}>
+                  <img src={thumb} alt={`${item.marque} ${item.modele}`} style={{ width: "70px", height: "70px", objectFit: "contain", background: "#f6f9ff", borderRadius: "10px", padding: "6px" }} />
                   <div>
-                    <p style={{ margin: "0 0 2px", fontWeight: 700, color: "#111", fontSize: "14px" }}>{item.marque} {item.modele}</p>
+                    <p style={{ margin: "0 0 2px", fontWeight: 700, color: B.text, fontSize: "14px" }}>{item.marque} {item.modele}</p>
                     <p style={{ margin: "0 0 8px", color: "#0b8457", fontWeight: 700 }}>${Number(item.prixVente).toLocaleString()}</p>
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => onCheckout(item)} style={{ background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "8px", padding: "6px 12px", fontWeight: 700, cursor: "pointer", fontSize: "12px" }}>Acheter</button>
+                      <button onClick={() => onCheckout(item)} style={{ background: GRAD, color: "#fff", border: "none", borderRadius: "8px", padding: "6px 12px", fontWeight: 700, cursor: "pointer", fontSize: "12px" }}>Acheter</button>
                       <button onClick={() => onRemoveItem(index)} style={{ background: "#fff", color: "#b42318", border: "1px solid #f5c2c2", borderRadius: "8px", padding: "6px 12px", fontWeight: 600, cursor: "pointer", fontSize: "12px" }}>Retirer</button>
                     </div>
                   </div>
                 </div>
               );
             })}
-            <button onClick={onCheckoutAll} style={{ width: "100%", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontSize: "15px", fontWeight: 800, cursor: "pointer", marginTop: "8px" }}>Tout acheter maintenant</button>
+            <button onClick={onCheckoutAll} style={{ width: "100%", background: GRAD, color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontSize: "15px", fontWeight: 800, cursor: "pointer", marginTop: "8px", boxShadow: "0 6px 16px rgba(21,101,216,0.3)" }}>Tout acheter maintenant</button>
           </div>
         )}
       </div>
@@ -604,23 +619,25 @@ function DrawerMenu({ onClose, siteConfig, categories, onFilterCategory }: {
   onFilterCategory: (cat: string) => void;
 }) {
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 4000, display: "flex", justifyContent: "flex-end" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.5)", zIndex: 4000, display: "flex", justifyContent: "flex-end" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "min(320px, 85vw)", background: "#fff", height: "100%", overflow: "auto", display: "flex", flexDirection: "column" }}>
         {/* Header drawer */}
-        <div style={{ background: "#1a1a2e", padding: "20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ background: GRAD, padding: "20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <img src={siteConfig.logoUrl ?? "https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg"} alt="Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain" }} />
+            <div style={{ background: "#fff", borderRadius: "10px", padding: "3px", display: "flex", flexShrink: 0 }}>
+              <img src="/logo-icon.png" alt="MillionStore" style={{ width: "36px", height: "36px", borderRadius: "7px", objectFit: "contain", display: "block" }} />
+            </div>
             <div>
               <p style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: "15px" }}>MillionStore</p>
-              <p style={{ margin: 0, color: "#aaa", fontSize: "11px" }}>{siteConfig.horaire ?? "Lun - Sam: 8h - 18h"}</p>
+              <p style={{ margin: 0, color: "#cfe0ff", fontSize: "11px" }}>{siteConfig.horaire ?? "Lun - Sam: 8h - 18h"}</p>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>×</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>×</button>
         </div>
 
         {/* Info magazen */}
-        <div style={{ padding: "16px", borderBottom: "1px solid #f0f0f0" }}>
-          <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: "13px", color: "#888", textTransform: "uppercase" }}>Informations</p>
+        <div style={{ padding: "16px", borderBottom: "1px solid #eef2fb" }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: "13px", color: "#7a859e", textTransform: "uppercase" }}>Informations</p>
           {[
             { icon: "📍", text: siteConfig.adres ?? "#25, Delmas 83, Port-au-Prince" },
             { icon: "📞", text: siteConfig.telephone1 ?? "+509 38332483" },
@@ -635,7 +652,7 @@ function DrawerMenu({ onClose, siteConfig, categories, onFilterCategory }: {
         </div>
 
         {/* Rezo sosyal */}
-        <div style={{ padding: "16px", borderBottom: "1px solid #f0f0f0", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div style={{ padding: "16px", borderBottom: "1px solid #eef2fb", display: "flex", gap: "10px", flexWrap: "wrap" }}>
           {siteConfig.whatsapp1 && (
             <a href={`https://wa.me/${siteConfig.whatsapp1}`} target="_blank" rel="noopener noreferrer" style={{ background: "#25D366", color: "#fff", padding: "8px 14px", borderRadius: "10px", fontSize: "13px", textDecoration: "none", fontWeight: 700 }}>💬 WhatsApp</a>
           )}
@@ -649,9 +666,9 @@ function DrawerMenu({ onClose, siteConfig, categories, onFilterCategory }: {
 
         {/* Kategori */}
         <div style={{ padding: "16px", flex: 1 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: "13px", color: "#888", textTransform: "uppercase" }}>Catégories</p>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: "13px", color: "#7a859e", textTransform: "uppercase" }}>Catégories</p>
           {["Tout", ...categories.filter(c => c !== "Tout")].map((cat) => (
-            <button key={cat} onClick={() => { onFilterCategory(cat); onClose(); }} style={{ width: "100%", textAlign: "left", padding: "12px 14px", border: "none", background: "transparent", borderBottom: "1px solid #f5f5f5", cursor: "pointer", fontSize: "15px", color: "#1a1a2e", fontWeight: 500, display: "flex", alignItems: "center", gap: "10px" }}>
+            <button key={cat} onClick={() => { onFilterCategory(cat); onClose(); }} style={{ width: "100%", textAlign: "left", padding: "12px 14px", border: "none", background: "transparent", borderBottom: "1px solid #f1f5fc", cursor: "pointer", fontSize: "15px", color: B.navy, fontWeight: 500, display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "18px" }}>{cat === "Tout" ? "🛍️" : cat === "Phone" ? "📱" : cat === "Laptop" ? "💻" : cat === "Ordinateur" ? "🖥️" : cat === "Tablette" ? "📟" : cat === "Accessoire" ? "🎧" : "📦"}</span>
               {cat === "Tout" ? "Tous les produits" : cat}
             </button>
@@ -659,8 +676,8 @@ function DrawerMenu({ onClose, siteConfig, categories, onFilterCategory }: {
         </div>
 
         {/* Footer drawer */}
-        <div style={{ padding: "16px", background: "#f8f9fa", borderTop: "1px solid #eee" }}>
-          <a href="/dashboard" style={{ display: "block", textAlign: "center", background: "#1a1a2e", color: "#fff", padding: "12px", borderRadius: "12px", textDecoration: "none", fontWeight: 700, fontSize: "14px" }}>
+        <div style={{ padding: "16px", background: "#f6f9ff", borderTop: `1px solid ${B.border}` }}>
+          <a href="/dashboard" style={{ display: "block", textAlign: "center", background: GRAD, color: "#fff", padding: "12px", borderRadius: "12px", textDecoration: "none", fontWeight: 700, fontSize: "14px" }}>
             🔐 Espace Admin
           </a>
         </div>
@@ -829,8 +846,30 @@ const [showGarantie, setShowGarantie] = useState(false);
 
   const activeQuickBtns = quickButtons.filter(b => b.active);
 
+  // ── Ekran lansman (splash) pandan pwodui yo ap chaje ──
+  if (loading) {
+    return (
+      <main style={{ minHeight: "100vh", background: `radial-gradient(circle at 50% 30%, #ffffff 0%, ${B.bg} 70%)`, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", fontFamily: "'Segoe UI', sans-serif" }}>
+        <div style={{ textAlign: "center", animation: "ms-splash-in .5s ease-out both" }}>
+          <div style={{ background: "#fff", borderRadius: "28px", padding: "22px 26px", boxShadow: "0 14px 44px rgba(10,60,160,0.18)", display: "inline-block", maxWidth: "100%" }}>
+            <img src="/logo-full.png" alt="MillionStore" style={{ width: "min(260px, 62vw)", height: "auto", display: "block", animation: "ms-pulse 1.8s ease-in-out infinite" }} />
+          </div>
+          <div style={{ width: "170px", height: "4px", background: "#dfe9fb", borderRadius: "4px", overflow: "hidden", margin: "28px auto 12px" }}>
+            <div style={{ width: "40%", height: "100%", background: GRAD_ACCENT, borderRadius: "4px", animation: "ms-load 1.2s ease-in-out infinite" }} />
+          </div>
+          <p style={{ color: "#7a859e", fontSize: "13px", margin: 0 }}>Chargement des produits...</p>
+        </div>
+        <style>{`
+          @keyframes ms-splash-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+          @keyframes ms-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+          @keyframes ms-load { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+        `}</style>
+      </main>
+    );
+  }
+
   return (
-    <main style={{ fontFamily: "'Segoe UI', sans-serif", background: "#f4f4f4", minHeight: "100vh", paddingBottom: "70px" }}>
+    <main style={{ fontFamily: "'Segoe UI', sans-serif", background: B.bg, minHeight: "100vh", paddingBottom: "70px" }}>
 
       {/* Modals */}
       {selectedProduct && <ProductModal product={selectedProduct} siteConfig={siteConfig} taux={taux} onClose={() => setSelectedProduct(null)} onAddToCart={(p) => setCart(prev => [...prev, p])} />}
@@ -877,42 +916,42 @@ const [showGarantie, setShowGarantie] = useState(false);
   />
 )}
       {showCategories && (
-  <div onClick={() => setShowCategories(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", maxHeight: "70vh", overflow: "auto", padding: "20px" }}>
-      <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 16px" }} />
-      <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: "#1a1a2e" }}>📂 Catégories</h3>
+  <div onClick={() => setShowCategories(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "22px 22px 0 0", width: "100%", maxWidth: "500px", maxHeight: "70vh", overflow: "auto", padding: "20px" }}>
+      <div style={{ width: "40px", height: "4px", background: "#d6e0f5", borderRadius: "2px", margin: "0 auto 16px" }} />
+      <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: B.navy }}>📂 Catégories</h3>
       <button
         onClick={() => { setSelectedCategory("Tout"); setSortBy("relevance"); setShowCategories(false); productsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-        style={{ width: "100%", textAlign: "left", padding: "14px 16px", border: "none", borderBottom: "1px solid #f5f5f5", background: selectedCategory === "Tout" ? "#f0f4ff" : "transparent", cursor: "pointer", fontSize: "15px", color: "#1a1a2e", fontWeight: selectedCategory === "Tout" ? 700 : 500, borderRadius: "10px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px" }}
+        style={{ width: "100%", textAlign: "left", padding: "14px 16px", border: "none", borderBottom: "1px solid #f1f5fc", background: selectedCategory === "Tout" ? "#eaf1ff" : "transparent", cursor: "pointer", fontSize: "15px", color: B.navy, fontWeight: selectedCategory === "Tout" ? 700 : 500, borderRadius: "10px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px" }}
       >
         <span style={{ fontSize: "20px" }}>🛍️</span> Tous les produits
-        {selectedCategory === "Tout" && <span style={{ marginLeft: "auto", color: "#e63946", fontWeight: 700 }}>✓</span>}
+        {selectedCategory === "Tout" && <span style={{ marginLeft: "auto", color: B.blue, fontWeight: 700 }}>✓</span>}
       </button>
       {categories.map((cat) => (
         <button
           key={cat}
           onClick={() => { setSelectedCategory(cat); setShowCategories(false); productsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-          style={{ width: "100%", textAlign: "left", padding: "14px 16px", border: "none", borderBottom: "1px solid #f5f5f5", background: selectedCategory === cat ? "#f0f4ff" : "transparent", cursor: "pointer", fontSize: "15px", color: "#1a1a2e", fontWeight: selectedCategory === cat ? 700 : 500, borderRadius: "10px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px" }}
+          style={{ width: "100%", textAlign: "left", padding: "14px 16px", border: "none", borderBottom: "1px solid #f1f5fc", background: selectedCategory === cat ? "#eaf1ff" : "transparent", cursor: "pointer", fontSize: "15px", color: B.navy, fontWeight: selectedCategory === cat ? 700 : 500, borderRadius: "10px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px" }}
         >
           <span style={{ fontSize: "20px" }}>
             {cat === "Phone" ? "📱" : cat === "Laptop" ? "💻" : cat === "Ordinateur" ? "🖥️" : cat === "Tablette" ? "📟" : cat === "Accessoire" ? "🎧" : "📦"}
           </span>
           {cat}
-          {selectedCategory === cat && <span style={{ marginLeft: "auto", color: "#e63946", fontWeight: 700 }}>✓</span>}
+          {selectedCategory === cat && <span style={{ marginLeft: "auto", color: B.blue, fontWeight: 700 }}>✓</span>}
         </button>
       ))}
     </div>
   </div>
 )}
 {showLivraison && (
-  <div onClick={() => setShowLivraison(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", padding: "24px", maxHeight: "80vh", overflow: "auto" }}>
-      <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 16px" }} />
-      <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: "#1a1a2e" }}>🚚 Livraison</h3>
+  <div onClick={() => setShowLivraison(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "22px 22px 0 0", width: "100%", maxWidth: "500px", padding: "24px", maxHeight: "80vh", overflow: "auto" }}>
+      <div style={{ width: "40px", height: "4px", background: "#d6e0f5", borderRadius: "2px", margin: "0 auto 16px" }} />
+      <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: B.navy }}>🚚 Livraison</h3>
       <p style={{ margin: 0, color: "#555", fontSize: "14px", lineHeight: 1.8, whiteSpace: "pre-line" }}>
         {siteConfig.livraisonTexte ?? "Livraison disponib nan tout Ayiti."}
       </p>
-      <button onClick={() => setShowLivraison(false)} style={{ width: "100%", marginTop: "20px", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>
+      <button onClick={() => setShowLivraison(false)} style={{ width: "100%", marginTop: "20px", padding: "14px", background: GRAD, color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>
         Fermer
       </button>
     </div>
@@ -920,14 +959,14 @@ const [showGarantie, setShowGarantie] = useState(false);
 )}
 
 {showGarantie && (
-  <div onClick={() => setShowGarantie(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "500px", padding: "24px", maxHeight: "80vh", overflow: "auto" }}>
-      <div style={{ width: "40px", height: "4px", background: "#e0e0e0", borderRadius: "2px", margin: "0 auto 16px" }} />
-      <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: "#1a1a2e" }}>🛡️ Garantie</h3>
+  <div onClick={() => setShowGarantie(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,25,70,0.5)", zIndex: 3500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "22px 22px 0 0", width: "100%", maxWidth: "500px", padding: "24px", maxHeight: "80vh", overflow: "auto" }}>
+      <div style={{ width: "40px", height: "4px", background: "#d6e0f5", borderRadius: "2px", margin: "0 auto 16px" }} />
+      <h3 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 700, color: B.navy }}>🛡️ Garantie</h3>
       <p style={{ margin: 0, color: "#555", fontSize: "14px", lineHeight: 1.8, whiteSpace: "pre-line" }}>
         {siteConfig.garantieTexte ?? "Garanti 30 jou sou tout pwodwi."}
       </p>
-      <button onClick={() => setShowGarantie(false)} style={{ width: "100%", marginTop: "20px", padding: "14px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>
+      <button onClick={() => setShowGarantie(false)} style={{ width: "100%", marginTop: "20px", padding: "14px", background: GRAD, color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>
         Fermer
       </button>
     </div>
@@ -935,16 +974,17 @@ const [showGarantie, setShowGarantie] = useState(false);
 )}
 
       {/* ── NAVBAR ── */}
-      <nav style={{ background: "#fff", borderBottom: "1px solid #eee", position: "sticky", top: 0, zIndex: 1000, boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+      <nav style={{ background: "#fff", position: "sticky", top: 0, zIndex: 1000, boxShadow: "0 2px 14px rgba(10,42,122,0.10)" }}>
+        <div style={{ height: "3px", background: GRAD_ACCENT }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px" }}>
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <img src={siteConfig.logoUrl ?? "https://i.ibb.co/gLmkySCv/ab785ed1481b.jpg"} alt="Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain" }} />
+            <img src="/logo-icon.png" alt="MillionStore" style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "contain" }} />
             <div>
-              <p style={{ margin: 0, fontSize: "13px", fontWeight: 800, color: "#1a1a2e", lineHeight: 1 }}>
-                Million<span style={{ color: "#e63946" }}>Store</span>
+              <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: B.navy, lineHeight: 1 }}>
+                Million<span style={{ color: B.sky }}>Store</span>
               </p>
-              <p style={{ margin: 0, fontSize: "9px", color: "#aaa", lineHeight: 1.2 }}>
+              <p style={{ margin: "2px 0 0", fontSize: "9px", color: "#9aa5bd", lineHeight: 1.2 }}>
                 {isOnline ? "🟢 En ligne" : "🔴 Hors ligne"}
               </p>
             </div>
@@ -955,22 +995,22 @@ const [showGarantie, setShowGarantie] = useState(false);
             {/* Kont */}
             <button onClick={() => { const raw = localStorage.getItem("ms_web_user"); window.location.href = raw ? "/dashboard" : "/login"; }} style={{ background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "10px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
               <span style={{ fontSize: "20px" }}>{mounted && isLoggedIn ? "✅" : "👤"}</span>
-              <span style={{ fontSize: "9px", color: "#666" }}>Compte</span>
+              <span style={{ fontSize: "9px", color: "#6b7794" }}>Compte</span>
             </button>
 
             {/* Panye */}
             <button onClick={() => setShowCart(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "10px", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
               <span style={{ fontSize: "20px" }}>🛒</span>
-              <span style={{ fontSize: "9px", color: "#666" }}>Panier</span>
+              <span style={{ fontSize: "9px", color: "#6b7794" }}>Panier</span>
               {cart.length > 0 && (
-                <span style={{ position: "absolute", top: "4px", right: "4px", background: "#e63946", color: "#fff", borderRadius: "999px", fontSize: "10px", minWidth: "16px", height: "16px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontWeight: 700 }}>{cart.length}</span>
+                <span style={{ position: "absolute", top: "4px", right: "4px", background: B.red, color: "#fff", borderRadius: "999px", fontSize: "10px", minWidth: "16px", height: "16px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontWeight: 700 }}>{cart.length}</span>
               )}
             </button>
 
             {/* 3 bar */}
             <button onClick={() => setShowDrawer(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "10px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-              <span style={{ fontSize: "20px" }}>☰</span>
-              <span style={{ fontSize: "9px", color: "#666" }}>Menu</span>
+              <span style={{ fontSize: "20px", color: B.navy }}>☰</span>
+              <span style={{ fontSize: "9px", color: "#6b7794" }}>Menu</span>
             </button>
           </div>
         </div>
@@ -978,15 +1018,15 @@ const [showGarantie, setShowGarantie] = useState(false);
         {/* Baw rechèch */}
         <div style={{ padding: "0 16px 10px" }}>
           <div style={{ position: "relative" }}>
-            <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px", color: "#888" }}>🔍</span>
+            <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px", color: "#8a96b0" }}>🔍</span>
             <input
               type="search"
               placeholder="Rechercher un produit, ID, IMEI..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: "100%", padding: "11px 14px 11px 42px", borderRadius: "25px", border: "1.5px solid #e0e0e0", fontSize: "14px", outline: "none", background: "#f8f8f8", boxSizing: "border-box", fontFamily: "inherit" }}
-              onFocus={(e) => { e.target.style.borderColor = "#1a1a2e"; e.target.style.background = "#fff"; }}
-              onBlur={(e) => { e.target.style.borderColor = "#e0e0e0"; e.target.style.background = "#f8f8f8"; }}
+              style={{ width: "100%", padding: "11px 14px 11px 42px", borderRadius: "25px", border: "1.5px solid #dbe5f7", fontSize: "14px", outline: "none", background: "#f4f8ff", boxSizing: "border-box", fontFamily: "inherit" }}
+              onFocus={(e) => { e.target.style.borderColor = B.blue; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 3px rgba(21,101,216,0.12)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "#dbe5f7"; e.target.style.background = "#f4f8ff"; e.target.style.boxShadow = "none"; }}
             />
           </div>
         </div>
@@ -994,13 +1034,13 @@ const [showGarantie, setShowGarantie] = useState(false);
         {/* Bouton rapid scroll horizontal */}
         <div style={{ overflowX: "auto", display: "flex", gap: "8px", padding: "0 16px 12px", scrollbarWidth: "none" }}>
           {/* Bouton "Tout" */}
-          <button onClick={() => { setSelectedCategory("Tout"); setSortBy("relevance"); }} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: "999px", border: selectedCategory === "Tout" && sortBy === "relevance" ? "1.5px solid #1a1a2e" : "1.5px solid #e0e0e0", background: selectedCategory === "Tout" && sortBy === "relevance" ? "#1a1a2e" : "#fff", color: selectedCategory === "Tout" && sortBy === "relevance" ? "#fff" : "#333", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
+          <button onClick={() => { setSelectedCategory("Tout"); setSortBy("relevance"); }} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: "999px", border: selectedCategory === "Tout" && sortBy === "relevance" ? `1.5px solid ${B.navy}` : "1.5px solid #dbe5f7", background: selectedCategory === "Tout" && sortBy === "relevance" ? GRAD : "#fff", color: selectedCategory === "Tout" && sortBy === "relevance" ? "#fff" : B.navy, fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
             🛍️ Tout
           </button>
           {activeQuickBtns.map((btn) => {
             const isActive = (btn.action === "filter" && btn.value === selectedCategory) || (btn.action === "filter" && btn.value === sortBy);
             return (
-              <button key={btn.id} onClick={() => handleQuickBtn(btn)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: "999px", border: isActive ? "1.5px solid #e63946" : "1.5px solid #e0e0e0", background: isActive ? "#e63946" : "#fff", color: isActive ? "#fff" : "#333", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
+              <button key={btn.id} onClick={() => handleQuickBtn(btn)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: "999px", border: isActive ? `1.5px solid ${B.blue}` : "1.5px solid #dbe5f7", background: isActive ? `linear-gradient(135deg, ${B.blue}, ${B.sky})` : "#fff", color: isActive ? "#fff" : B.navy, fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
                 {btn.icon} {btn.label}
               </button>
             );
@@ -1008,35 +1048,36 @@ const [showGarantie, setShowGarantie] = useState(false);
         </div>
       </nav>
 
-      {/* ── TAUX ── */}
-      {taux > 1 && (
-        <div style={{ background: "#1a1a2e", color: "#fff", textAlign: "center", padding: "6px 16px", fontSize: "13px", fontWeight: 600 }}>
-          💱 Taux du jour: 1$ = {taux} HTG
-        </div>
-      )}
+      {/* ── BANDE CONFIANCE + TAUX ── */}
+      <div style={{ background: "#fff", borderBottom: `1px solid ${B.border}`, display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: "16px", rowGap: "6px", padding: "9px 10px" }}>
+        {[
+          { icon: "🚚", text: "Livraison rapide" },
+          { icon: "🛡️", text: "Garantie incluse" },
+          { icon: "🔒", text: "Paiement sécurisé" },
+          ...(taux > 1 ? [{ icon: "💱", text: `Taux du jour: 1$ = ${taux} HTG` }] : []),
+        ].map(({ icon, text }) => (
+          <span key={text} style={{ fontSize: "11px", fontWeight: 700, color: B.navy, display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: "14px" }}>{icon}</span>{text}
+          </span>
+        ))}
+      </div>
 
       {/* ── PRODUITS ── */}
       <div ref={productsRef} style={{ padding: "16px" }}>
         {/* Toolbar */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
         <p style={{ margin: 0, fontSize: "14px", color: "#555" }}>
-  {selectedCategory !== "Tout" && <span style={{ color: "#e63946", fontWeight: 700 }}>{selectedCategory}</span>}
+  {selectedCategory !== "Tout" && <span style={{ color: B.blue, fontWeight: 700 }}>{selectedCategory}</span>}
 </p>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} style={{ border: "1px solid #ddd", borderRadius: "8px", padding: "6px 10px", fontSize: "13px", background: "#fff", outline: "none", fontFamily: "inherit" }}>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} style={{ border: "1px solid #dbe5f7", borderRadius: "8px", padding: "6px 10px", fontSize: "13px", background: "#fff", color: B.navy, outline: "none", fontFamily: "inherit" }}>
             <option value="relevance">Pertinence</option>
             <option value="priceAsc">Prix: bas → haut</option>
             <option value="priceDesc">Prix: haut → bas</option>
           </select>
         </div>
 
-        {loading ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            {[...Array(6)].map((_, i) => (
-              <div key={i} style={{ background: "#fff", borderRadius: "14px", height: "260px", border: "1px solid #eee", animation: "pulse 1.5s infinite" }} />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 24px", background: "#fff", borderRadius: "16px", border: "1px solid #eee" }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 24px", background: "#fff", borderRadius: "16px", border: `1px solid ${B.border}` }}>
             <p style={{ fontSize: "48px", margin: "0 0 12px" }}>🔍</p>
             <p style={{ color: "#666", fontSize: "16px", margin: 0 }}>Aucun produit trouvé.</p>
           </div>
@@ -1050,11 +1091,11 @@ const [showGarantie, setShowGarantie] = useState(false);
               const lowStock = (p.stock ?? 99) <= 2 && (p.stock ?? 99) > 0;
 
               return (
-                <div key={p.id} onClick={() => { setSelectedProduct(p); trackClick(p.id); }} style={{ background: "#fff", borderRadius: "14px", border: "1px solid #eee", overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+                <div key={p.id} className="ms-card" onClick={() => { setSelectedProduct(p); trackClick(p.id); }} style={{ background: "#fff", borderRadius: "16px", border: `1px solid ${B.border}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 2px 10px rgba(10,42,122,0.07)" }}>
                   {/* Image */}
-                  <div style={{ position: "relative", background: "#fafafa", height: "150px", display: "flex", alignItems: "center", justifyContent: "center", padding: "8px" }}>
+                  <div style={{ position: "relative", background: "linear-gradient(180deg,#f8fbff,#eef3fc)", height: "150px", display: "flex", alignItems: "center", justifyContent: "center", padding: "8px" }}>
                     <img src={thumb} alt={`${p.marque} ${p.modele}`} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} onError={(e) => { (e.target as HTMLImageElement).src = getFallbackImage(p); }} />
-                    {imgs.length > 1 && <span style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(0,0,0,0.5)", color: "#fff", borderRadius: "6px", padding: "2px 6px", fontSize: "10px" }}>📷 {imgs.length}</span>}
+                    {imgs.length > 1 && <span style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(10,25,70,0.55)", color: "#fff", borderRadius: "6px", padding: "2px 6px", fontSize: "10px" }}>📷 {imgs.length}</span>}
                     {lowStock && <span style={{ position: "absolute", top: "6px", left: "6px", background: "#ff6b35", color: "#fff", borderRadius: "6px", padding: "2px 7px", fontSize: "10px", fontWeight: 700 }}>Dèrnier {p.stock}!</span>}
                   </div>
 
@@ -1064,22 +1105,22 @@ const [showGarantie, setShowGarantie] = useState(false);
                       <span style={{ background: `${color}18`, color, padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 700 }}>{p.category}</span>
                       {logo && <img src={logo} alt={p.marque} style={{ height: "14px", objectFit: "contain" }} />}
                     </div>
-                    <p style={{ margin: "0 0 4px", color: "#333", fontSize: "12px", fontWeight: 700 }}>🔖 ID: {p.id}</p>
+                    <p style={{ margin: "0 0 4px", color: "#4a5673", fontSize: "12px", fontWeight: 700 }}>🔖 ID: {p.id}</p>
                     {p.grade && (
   <span style={{ display: "inline-block", background: getGradeColor(p.grade), color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 800, marginBottom: "4px" }}>
     {getGradeLabel(p.grade)}
   </span>
 )}
-                    <h3 style={{ margin: "0 0 4px", fontSize: "13px", color: "#111820", lineHeight: 1.3, fontWeight: 700 }}>{p.marque} {p.modele}</h3>
-                    {p.description && <p style={{ margin: "0 0 6px", color: "#888", fontSize: "11px", lineHeight: 1.3 }}>{p.description.length > 50 ? p.description.slice(0, 50) + "…" : p.description}</p>}
+                    <h3 style={{ margin: "0 0 4px", fontSize: "13px", color: B.text, lineHeight: 1.3, fontWeight: 700 }}>{p.marque} {p.modele}</h3>
+                    {p.description && <p style={{ margin: "0 0 6px", color: "#8a96b0", fontSize: "11px", lineHeight: 1.3 }}>{p.description.length > 50 ? p.description.slice(0, 50) + "…" : p.description}</p>}
                     <div style={{ marginBottom: "8px" }}>
-  <p style={{ margin: 0, color: "#111", fontWeight: 800, fontSize: "17px" }}>${Number(p.prixVente).toLocaleString()}</p>
+  <p style={{ margin: 0, color: B.navy, fontWeight: 800, fontSize: "17px" }}>${Number(p.prixVente).toLocaleString()}</p>
   {taux > 1 && (
-    <p style={{ margin: "2px 0 0", color: "#0984E3", fontWeight: 700, fontSize: "12px" }}>≈ {formatHTG(Number(p.prixVente), taux)}</p>
+    <p style={{ margin: "2px 0 0", color: B.sky, fontWeight: 700, fontSize: "12px" }}>≈ {formatHTG(Number(p.prixVente), taux)}</p>
   )}
 </div>
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }} style={{ width: "100%", borderRadius: "8px", border: "none", background: "#1a1a2e", color: "#fff", padding: "8px", fontWeight: 600, cursor: "pointer", fontSize: "12px" }}>
-                      Voir détails
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }} style={{ background: "none", border: "none", color: B.blue, padding: "2px 0", fontWeight: 700, cursor: "pointer", fontSize: "12px", fontFamily: "inherit" }}>
+                      Voir détails ›
                     </button>
                   </div>
                 </div>
@@ -1090,11 +1131,11 @@ const [showGarantie, setShowGarantie] = useState(false);
       </div>
 
       {/* ── BOTTOM BAR ── */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #eee", display: "flex", zIndex: 999, boxShadow: "0 -2px 10px rgba(0,0,0,0.08)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: `1px solid ${B.border}`, display: "flex", zIndex: 999, boxShadow: "0 -2px 12px rgba(10,42,122,0.08)" }}>
         {/* Accueil */}
         <button onClick={() => { setSelectedCategory("Tout"); setSortBy("relevance"); setSearchTerm(""); window.scrollTo({ top: 0, behavior: "smooth" }); }} style={{ flex: 1, padding: "10px 8px", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
           <span style={{ fontSize: "20px" }}>🏠</span>
-          <span style={{ fontSize: "10px", color: "#1a1a2e", fontWeight: 700 }}>Accueil</span>
+          <span style={{ fontSize: "10px", color: B.blue, fontWeight: 700 }}>Accueil</span>
         </button>
 
         {/* WhatsApp */}
@@ -1112,7 +1153,7 @@ const [showGarantie, setShowGarantie] = useState(false);
   <span style={{ fontSize: "20px" }}>
     {mounted && !!localStorage.getItem("ms_client_user") ? "🛍️" : "👤"}
   </span>
-  <span style={{ fontSize: "10px", color: "#666", fontWeight: 600 }}>
+  <span style={{ fontSize: "10px", color: "#6b7794", fontWeight: 600 }}>
     Mes Commandes
   </span>
 </button>
@@ -1122,6 +1163,8 @@ const [showGarantie, setShowGarantie] = useState(false);
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         ::-webkit-scrollbar { display: none; }
         * { -webkit-tap-highlight-color: transparent; }
+        .ms-card { transition: transform .18s ease, box-shadow .18s ease; }
+        .ms-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(10,42,122,0.16) !important; }
       `}</style>
     </main>
   );
