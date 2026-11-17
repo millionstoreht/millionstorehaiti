@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { where } from "firebase/firestore";
 import {
-  Wallet, Users, Package, TrendingUp, ChevronRight, Wifi, WifiOff,
+  Receipt, Wallet, Users, Package, ChevronRight, Wifi, WifiOff,
 } from "lucide-react";
 import BestSellerBanner from "../../lib/BestSellerBanner";
 import { C, MenuItem, UserSession, readCol, useDash } from "./dashboard-shared";
@@ -212,21 +212,17 @@ async function loadSnapshot(localId: string, user: UserSession, full: boolean): 
   }
   s.cmdByStatut = cs; s.cmdTotal = ct;
 
-  // Vendeurs
-  const vl: Pair[] = [];
-  let vSolde = 0;
-  for (const v of vendeurs) {
-    vSolde += num(v.balance);
-    let tot = 0;
-    for (const t of v.ventes || []) {
-      if (!t || t.annule === true) continue;
-      const d = toDate(t.date);
-      if (!d || d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) continue;
-      tot += num(t.prixVente);
+    // Vendeurs : solde réel de chaque vendeur (même chiffre que la page Vendeurs)
+    const vl: Pair[] = [];
+    let vSolde = 0;
+    for (const v of vendeurs) {
+      const bal = Math.round((num(v.balance) + Number.EPSILON) * 100) / 100;
+      vSolde += bal;
+      vl.push([String(v.nom || "Vendeur"), bal]);
     }
-    vl.push([String(v.nom || "Vendeur"), tot]);
-  }
-  s.vendTop = vl.sort((a, b) => b[1] - a[1]).slice(0, 4); s.vendSolde = vSolde; s.vendCount = vendeurs.length;
+    s.vendTop = vl.sort((a, b) => b[1] - a[1]);
+    s.vendSolde = Math.round((vSolde + Number.EPSILON) * 100) / 100;
+    s.vendCount = vendeurs.length;
 
   // Fournisseurs
   const seeAllFour = admin || p.fournisseurDepot === true || p.fournisseurRetrait === true;
@@ -279,6 +275,7 @@ async function loadSnapshot(localId: string, user: UserSession, full: boolean): 
 // ══════════════════════════════════════════════════════════════════════════
 const usdShort = (v: number) => (Math.abs(v) >= 1000 ? `$${(v / 1000).toFixed(1)}K` : `$${v.toFixed(0)}`);
 const usdFull = (v: number) => "$" + Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const usdExact = (v: number) => (v < 0 ? "-" : "") + "$" + Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 const pct = (cur: number, prev: number): number | null => (prev <= 0 ? null : ((cur - prev) / prev) * 100);
 const deltaLabel = (cur: number, prev: number, suffix = ""): string => {
   const p = pct(cur, prev);
@@ -294,15 +291,26 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 }
 
 function StatCard({ label, value, delta, up, color, icon }: { label: string; value: string; delta: string; up: boolean; color: string; icon: React.ReactNode }) {
+  const dc = up ? C.green : C.red;
+  const ellipsis: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   return (
-    <Card style={{ borderTop: `4px solid ${color}` }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 12, color: C.grey, fontWeight: 600 }}>{label}</span>
-        <span style={{ color, background: color + "1A", borderRadius: 10, padding: 6, display: "flex" }}>{icon}</span>
+    <div style={{ background: "#fff", borderRadius: 16, padding: 12, height: 128, boxSizing: "border-box",
+      boxShadow: "0 4px 10px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column",
+      justifyContent: "space-between", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ width: 32, height: 32, borderRadius: 10, background: color + "24", color,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</span>
+        <span style={{ flex: 1 }} />
+        {delta && (
+          <span style={{ background: dc + "1A", color: dc, borderRadius: 20, padding: "3px 8px",
+            fontSize: 11, fontWeight: 700, minWidth: 0, ...ellipsis }}>{delta}</span>
+        )}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: "8px 0 2px" }}>{value}</div>
-      {delta && <div style={{ fontSize: 12, fontWeight: 700, color: up ? C.green : C.red }}>{delta}</div>}
-    </Card>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.text, ...ellipsis }}>{value}</div>
+        <div style={{ fontSize: 12, color: C.grey, marginTop: 2, ...ellipsis }}>{label}</div>
+      </div>
+    </div>
   );
 }
 
@@ -527,13 +535,21 @@ export default function DashboardPage() {
   // ── Cartes de statistiques (selon permissions) ──
   const stats: React.ReactNode[] = [];
   if (s?.hasFact || (!s && (admin || p.factureVoir || p.factureVoirIstwa || p.rapportVoir)))
-    stats.push(<StatCard key="v" label={s?.scopedToOwn ? "Mes ventes du jour" : "Ventes du jour"} value={s ? usdFull(s.todayUSD) : "—"} delta={s ? deltaLabel(s.todayUSD, s.yesterdayUSD, " vs hier") : ""} up={!s || s.todayUSD >= s.yesterdayUSD} color={C.green} icon={<Wallet size={18} />} />);
+    stats.push(<StatCard key="v" label={s?.scopedToOwn ? "Mes ventes du jour" : "Ventes du jour"}
+      value={s ? usdShort(s.todayUSD) : "—"}
+      delta={s ? deltaLabel(s.todayUSD, s.yesterdayUSD) : ""}
+      up={!s || s.todayUSD >= s.yesterdayUSD} color="#2196F3" icon={<Receipt size={18} />} />);
   if (admin || p.clientVoir === true)
-    stats.push(<StatCard key="c" label="Clients" value={s ? String(s.clientCount) : "—"} delta="" up color={C.blue} icon={<Users size={18} />} />);
+    stats.push(<StatCard key="c" label="Clients" value={s ? String(s.clientCount) : "—"}
+      delta="" up color="#2EB67D" icon={<Users size={18} />} />);
   if (admin || p.produitVoir === true)
-    stats.push(<StatCard key="p" label="Stock bas" value={s ? String(s.lowStock) : "—"} delta={s ? `${s.outStock} épuisés` : ""} up={!s || (s.lowStock === 0 && s.outStock === 0)} color={C.orange} icon={<Package size={18} />} />);
+    stats.push(<StatCard key="p" label="Stock bas" value={s ? String(s.lowStock) : "—"}
+      delta={s ? (s.lowStock > 0 ? "⚠ à vérifier" : "OK") : ""}
+      up={!s || s.lowStock === 0} color="#FF9800" icon={<Package size={18} />} />);
   if (showRev)
-    stats.push(<StatCard key="r" label="Revenu du mois" value={s ? usdShort(s.monthUSD) : "—"} delta={s ? deltaLabel(s.monthUSD, s.prevMonthUSD) : ""} up={!s || s.monthUSD >= s.prevMonthUSD} color={C.purple} icon={<TrendingUp size={18} />} />);
+    stats.push(<StatCard key="r" label="Revenu du mois" value={s ? usdShort(s.monthUSD) : "—"}
+      delta={s ? deltaLabel(s.monthUSD, s.prevMonthUSD) : ""}
+      up={!s || s.monthUSD >= s.prevMonthUSD} color="#7C5CFF" icon={<Wallet size={18} />} />);
 
   // ── Cartes graphiques par page ──
   const modules: React.ReactNode[] = [];
@@ -585,11 +601,11 @@ export default function DashboardPage() {
   }
 
   if (it.vendeurs && ds?.hasVend) {
-    const max = ds.vendTop[0]?.[1] || 1;
+    const max = Math.max(...ds.vendTop.map((x) => x[1]), 1);
     modules.push(
-      <ModuleCard key="vendeurs" item={it.vendeurs} title="Ventes par vendeur (mois)" big={String(ds.vendCount)} delta={`solde total ${usdFull(ds.vendSolde)}`}>
+      <ModuleCard key="vendeurs" item={it.vendeurs} title="Solde de chaque vendeur" big={usdExact(ds.vendSolde)} delta={`${ds.vendCount} vendeur${ds.vendCount > 1 ? "s" : ""}`}>
         {ds.vendTop.length === 0 ? <Empty msg="Aucun vendeur" /> :
-          <HBars color={it.vendeurs.color} items={ds.vendTop.map(([label, v]) => ({ label, ratio: v / max, value: usdFull(v) }))} />}
+          <HBars color={it.vendeurs.color} items={ds.vendTop.map(([label, v]) => ({ label, ratio: v / max, value: usdExact(v) }))} />}
       </ModuleCard>,
     );
   }
@@ -631,7 +647,6 @@ export default function DashboardPage() {
       </ModuleCard>,
     );
 
-  const noChart = visibleItems.filter((i) => !["rapports", "calendrier", "commandes", "vendeurs", "fournisseurs", "livraison", "workers", "rapportage"].includes(i.key));
 
   const localName = locals.find((l) => l.id === localId)?.name || "";
 
@@ -690,36 +705,20 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* Accès rapides (pages sans graphique) */}
-      {visibleItems.length === 0 ? (
+{visibleItems.length === 0 && (
         <div style={{ background: "#fff", borderRadius: 20, padding: 60, textAlign: "center", border: "1px solid #eee", marginTop: 20 }}>
           <p style={{ fontSize: 48, margin: "0 0 12px" }}>🔒</p>
           <p style={{ color: "#666", fontSize: 16, fontWeight: 700, margin: "0 0 6px" }}>Aucun accès disponible</p>
           <p style={{ color: "#aaa", fontSize: 13, margin: 0 }}>Contactez un administrateur pour vos permissions.</p>
         </div>
-      ) : noChart.length > 0 && (
-        <>
-          <h2 style={{ fontSize: 16, color: C.text, margin: "26px 0 12px", fontWeight: 800 }}>Accès rapides</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
-            {noChart.map((m) => (
-              <Link key={m.key} href={m.href} style={{ textDecoration: "none" }}>
-                <div className="ms-tile">
-                  <div style={{ color: m.color, display: "flex" }}>{m.icon(40)}</div>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.text }}>{m.label}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </>
       )}
 
       <style>{`
         @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
         .ms-bar { width: 30%; height: 100%; background: ${C.primary}; border-radius: 3px; animation: slide 1.2s ease-in-out infinite; }
-        .ms-grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+        .ms-grid-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         .ms-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
-        .ms-tile { background: #fff; border-radius: 20px; padding: 22px 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; transition: transform .15s; }
-        .ms-tile:hover { transform: translateY(-4px); }
+        
         @media (max-width: 860px) {
           .ms-grid-2 { grid-template-columns: 1fr; }
         }
