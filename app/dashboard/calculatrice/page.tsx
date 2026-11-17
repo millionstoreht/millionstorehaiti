@@ -24,6 +24,7 @@ const NAVY = "#1A1D2E", VIOLET = "#4A3AA7", ORANGE = "#FF6B35";
 const DEFAULT_TAUX = 135;
 const DH_RATE = 5; // 1 $HT = 5 HTG
 const HIST_KEY = "calc_history";
+const STATE_KEY = "calc_state";
 const OPS = ["+", "-", "×", "÷"];
 
 const CUR_ORDER: Cur[] = ["usd", "htg", "dh"];
@@ -198,6 +199,7 @@ export default function CalculatricePage() {
   const [snack, setSnack] = useState<{ msg: string; color: string } | null>(null);
   const modalOpen = useRef(false);
   modalOpen.current = showTauxModal;
+  const restored = useRef(false);
 
   const showSnack = (msg: string, color = "#00C853") => {
     setSnack({ msg, color });
@@ -287,6 +289,36 @@ export default function CalculatricePage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [press]);
+
+    // ─── RESTORE ETA A (retounen kote w te rete a) ─────────────────────────
+    useEffect(() => {
+      if (!user || !canOpen || restored.current) return;
+      try {
+        const raw = localStorage.getItem(STATE_KEY);
+        if (raw) {
+          const m = JSON.parse(raw);
+          if (typeof m.expr === "string") setExpr(m.expr);
+          setJustEval(m.justEval === true);
+          setConvert(m.convert === true);
+          const f: Cur = CUR_ORDER.includes(m.from) ? m.from : "usd";
+          const t: Cur = CUR_ORDER.includes(m.to) ? m.to : "htg";
+          setFrom(f);
+          setTo(f === t ? (f === "htg" ? "usd" : "htg") : t);
+        }
+      } catch {}
+      restored.current = true;
+    }, [user, canOpen]);
+  
+    // ─── SÈRE ETA A chak fwa yon bagay chanje ──────────────────────────────
+    useEffect(() => {
+      if (!restored.current) return;
+      try {
+        localStorage.setItem(
+          STATE_KEY,
+          JSON.stringify({ expr, justEval, convert, from, to })
+        );
+      } catch {}
+    }, [expr, justEval, convert, from, to]);
 
   // ─── ACTIONS ───────────────────────────────────────────────────────────
   const swap = () => {
