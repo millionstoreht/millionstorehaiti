@@ -2,14 +2,15 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "../../../lib/firebase";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 
 // =============================================================================
 // CALCULATRICE + CONVERTISSEUR  ($ • HTG • $HT)
-//  • Taux du jour en haut (l'admin clique sur le petit crayon)
+//  • Le taux se modifie dans les Paramètres de l'app (plus ici)
 //  • 1 $ = taux HTG   (ex. 135)
 //  • 1 $HT = 5 HTG   (fixe)  →  1 $ = taux ÷ 5 $HT (ex. 27)
 //  • Résultat automatique, historique, copier, équivalences, clavier physique
+//  • Mise en page adaptative (tous les écrans), état sauvegardé
 // =============================================================================
 
 // ─── 1. TYPES & CONSTANTES ───────────────────────────────────────────────────
@@ -20,7 +21,7 @@ interface UserSession {
 interface HistItem { e: string; r: string; t: string; }
 type Cur = "usd" | "htg" | "dh";
 
-const NAVY = "#1A1D2E", VIOLET = "#4A3AA7", ORANGE = "#FF6B35";
+const NAVY = "#1A1D2E", ORANGE = "#FF6B35";
 const DEFAULT_TAUX = 135;
 const DH_RATE = 5; // 1 $HT = 5 HTG
 const HIST_KEY = "calc_history";
@@ -195,10 +196,8 @@ export default function CalculatricePage() {
   const [taux, setTaux] = useState(DEFAULT_TAUX);
   const [history, setHistory] = useState<HistItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [showTauxModal, setShowTauxModal] = useState(false);
+  const [menu, setMenu] = useState<"from" | "to" | null>(null);
   const [snack, setSnack] = useState<{ msg: string; color: string } | null>(null);
-  const modalOpen = useRef(false);
-  modalOpen.current = showTauxModal;
   const restored = useRef(false);
 
   const showSnack = (msg: string, color = "#00C853") => {
@@ -214,7 +213,7 @@ export default function CalculatricePage() {
     catch { router.push("/login"); }
   }, [router]);
 
-  // ─── TAUX (parametres/taux, mis à jour en direct) + HISTORIQUE ─────────
+  // ─── TAUX (lecture seule, mis à jour en direct) + HISTORIQUE ───────────
   useEffect(() => {
     if (!user || !canOpen) return;
     const cached = parseFloat(localStorage.getItem("taux_dollar_htg") ?? "");
@@ -268,7 +267,6 @@ export default function CalculatricePage() {
   // ─── CLAVIER PHYSIQUE ──────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (modalOpen.current) return;
       const t = ev.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
       if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
@@ -290,35 +288,32 @@ export default function CalculatricePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [press]);
 
-    // ─── RESTORE ETA A (retounen kote w te rete a) ─────────────────────────
-    useEffect(() => {
-      if (!user || !canOpen || restored.current) return;
-      try {
-        const raw = localStorage.getItem(STATE_KEY);
-        if (raw) {
-          const m = JSON.parse(raw);
-          if (typeof m.expr === "string") setExpr(m.expr);
-          setJustEval(m.justEval === true);
-          setConvert(m.convert === true);
-          const f: Cur = CUR_ORDER.includes(m.from) ? m.from : "usd";
-          const t: Cur = CUR_ORDER.includes(m.to) ? m.to : "htg";
-          setFrom(f);
-          setTo(f === t ? (f === "htg" ? "usd" : "htg") : t);
-        }
-      } catch {}
-      restored.current = true;
-    }, [user, canOpen]);
-  
-    // ─── SÈRE ETA A chak fwa yon bagay chanje ──────────────────────────────
-    useEffect(() => {
-      if (!restored.current) return;
-      try {
-        localStorage.setItem(
-          STATE_KEY,
-          JSON.stringify({ expr, justEval, convert, from, to })
-        );
-      } catch {}
-    }, [expr, justEval, convert, from, to]);
+  // ─── RESTORE ETA A (retourner là où on était) ──────────────────────────
+  useEffect(() => {
+    if (!user || !canOpen || restored.current) return;
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (raw) {
+        const m = JSON.parse(raw);
+        if (typeof m.expr === "string") setExpr(m.expr);
+        setJustEval(m.justEval === true);
+        setConvert(m.convert === true);
+        const f: Cur = CUR_ORDER.includes(m.from) ? m.from : "usd";
+        const t: Cur = CUR_ORDER.includes(m.to) ? m.to : "htg";
+        setFrom(f);
+        setTo(f === t ? (f === "htg" ? "usd" : "htg") : t);
+      }
+    } catch {}
+    restored.current = true;
+  }, [user, canOpen]);
+
+  // ─── SÈRE ETA A chak fwa yon bagay chanje ──────────────────────────────
+  useEffect(() => {
+    if (!restored.current) return;
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({ expr, justEval, convert, from, to }));
+    } catch {}
+  }, [expr, justEval, convert, from, to]);
 
   // ─── ACTIONS ───────────────────────────────────────────────────────────
   const swap = () => {
@@ -339,24 +334,11 @@ export default function CalculatricePage() {
     } catch { showSnack("Impossible de copier", "#e65100"); }
   };
 
-  const saveTaux = async (v: number) => {
-    try {
-      await withTimeout(setDoc(doc(db, "parametres", "taux"),
-        { taux: v, updatedAt: new Date().toISOString() }), 8000);
-      setTaux(v);
-      localStorage.setItem("taux_dollar_htg", String(v));
-      setShowTauxModal(false);
-      showSnack(`✅ Taux enregistré : 1 $ = ${fmt(v, 4)} HTG`);
-    } catch {
-      showSnack("❌ Pas sauvegardé. Connexion lente, réessayez.", "#ff4444");
-    }
-  };
-
   if (!user) return null;
-  
+
   if (!canOpen) {
     return (
-      <main style={{ minHeight: "100vh", background: "#0F1117", fontFamily: "'Segoe UI',sans-serif",
+      <main style={{ minHeight: "100dvh", background: "#0F1117", fontFamily: "'Segoe UI',sans-serif",
         color: "#fff", display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", gap: 14, padding: 20, textAlign: "center" }}>
         <div style={{ fontSize: 54 }}>🔒</div>
@@ -377,6 +359,7 @@ export default function CalculatricePage() {
     : res !== null ? fmt(res, convert ? decFor(res) : 8) : "0";
   if (convert && !div0) main = withCur(main, from);
   const convLine = `= ${withCur(fmt(converted, decFor(converted)), to)}`;
+  const longMain = main.length > 12;
 
   const rows = [
     ["C", "⌫", "%", "÷"],
@@ -392,8 +375,9 @@ export default function CalculatricePage() {
     else if (k === "=") { bg = `linear-gradient(180deg,#FF9A5C,${ORANGE})`; fg = "#fff"; sh = "0 3px 7px rgba(255,107,53,0.4)"; }
     else if (["%", "÷", "×", "-", "+"].includes(k)) { bg = "linear-gradient(180deg,#5B4CC4,#3A2F8F)"; fg = "#fff"; sh = "0 3px 7px rgba(58,47,143,0.35)"; }
     return {
-      height: 60, border: "none", borderRadius: 18, background: bg, color: fg, boxShadow: sh,
-      fontSize: 24, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+      width: "100%", height: "100%", minHeight: 44, border: "none", borderRadius: 18,
+      background: bg, color: fg, boxShadow: sh,
+      fontSize: "clamp(20px, 3.6dvh, 28px)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
     };
   };
 
@@ -404,17 +388,56 @@ export default function CalculatricePage() {
     display: "flex", alignItems: "center", justifyContent: "center",
   });
 
-  const pill = (c: string): React.CSSProperties => ({
-    background: `${c}38`, border: `1px solid ${c}8c`, color: "#fff",
-    padding: "4px 9px", borderRadius: 10, fontSize: 11, fontWeight: 600,
-  });
+  // Sélecteur de devise (menu déroulant) comme dans l'app Flutter
+  const curPicker = (value: Cur, isFrom: boolean) => {
+    const key = isFrom ? "from" : "to";
+    const open = menu === key;
+    return (
+      <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+        <button onClick={() => setMenu(open ? null : key)}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+            background: "#fff", cursor: "pointer", fontFamily: "inherit", color: NAVY,
+            borderRadius: 16, border: `1.4px solid ${CUR_COLOR[value]}8c`,
+            boxShadow: `0 3px 8px ${CUR_COLOR[value]}1f`, textAlign: "left" }}>
+          <span style={badge(value, 30)}>{CUR_SHORT[value]}</span>
+          <span style={{ flex: 1, display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+            <span style={{ fontSize: 9, color: "#aaa", fontWeight: 700 }}>{isFrom ? "DE" : "VERS"}</span>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>{CUR_LABEL[value]}</span>
+          </span>
+          <span style={{ color: "#aaa", fontSize: 12 }}>▾</span>
+        </button>
+
+        {open && (
+          <>
+            <div onClick={() => setMenu(null)}
+              style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+            <div style={{ position: "absolute", top: "calc(100% + 4px)", [isFrom ? "left" : "right"]: 0,
+              minWidth: 210, background: "#fff", borderRadius: 16, padding: 6, zIndex: 50,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.22)" }}>
+              {CUR_ORDER.map(c => (
+                <button key={c} onClick={() => { if (isFrom) pickFrom(c); else pickTo(c); setMenu(null); }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+                    border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 14, color: NAVY, textAlign: "left",
+                    background: c === value ? `${CUR_COLOR[c]}18` : "transparent",
+                    fontWeight: c === value ? 700 : 500 }}>
+                  <span style={badge(c, 28)}>{CUR_SHORT[c]}</span>
+                  {CUR_NAME[c]}  ({CUR_LABEL[c]})
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0F1117",
-      fontFamily: "'Segoe UI',sans-serif", color: "#fff" }}>
+    <main style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "#0F1117",
+      fontFamily: "'Segoe UI',sans-serif", color: "#fff", overflow: "hidden" }}>
 
       {/* HEADER */}
-      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "14px 20px",
+      <div style={{ borderBottom: "1px solid #1e1e2e", padding: "10px 16px", flexShrink: 0,
         display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={() => router.push("/dashboard")} title="Retour"
           style={{ background: "#1A1D2E", border: "none", color: "#aaa", width: 36, height: 36,
@@ -422,41 +445,16 @@ export default function CalculatricePage() {
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Calculatrice</h1>
       </div>
 
-      <div style={{ maxWidth: 460, margin: "24px auto", padding: "0 16px" }}>
-        <div style={{ background: "#F4F5FA", color: NAVY, borderRadius: 28, padding: 18,
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+      {/* ZONE QUI S'ADAPTE À L'ÉCRAN */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex",
+        justifyContent: "center", padding: "10px 12px 12px" }}>
+        <div style={{ background: "#F4F5FA", color: NAVY, borderRadius: 28, padding: 14,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)", width: "100%", maxWidth: 460,
+          height: "100%", minHeight: 560, maxHeight: 900,
+          display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
 
-          {/* ── 1) TAUX DU JOUR (tout en haut) ── */}
-          <div style={{ background: `linear-gradient(135deg, ${NAVY}, ${VIOLET})`, borderRadius: 22,
-            padding: "12px 10px 12px 14px", display: "flex", alignItems: "center", gap: 12,
-            boxShadow: `0 6px 16px ${VIOLET}59`, color: "#fff" }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.14)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💱</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1.4, fontWeight: 700 }}>
-                TAUX DU JOUR
-              </div>
-              <div style={{ fontSize: 21, fontWeight: 700, margin: "2px 0 6px" }}>
-                1 $ = {fmt(taux, 4)} HTG
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                <span style={pill(CUR_COLOR.dh)}>1 $ = {fmt(taux / DH_RATE, 4)} $HT</span>
-                <span style={pill(CUR_COLOR.htg)}>1 $HT = {fmt(DH_RATE)} HTG</span>
-              </div>
-            </div>
-            {/* Seulement un petit crayon, visible pour l'admin */}
-            {user.isAdmin && (
-              <button onClick={() => setShowTauxModal(true)} title="Modifier le taux"
-                style={{ width: 32, height: 32, borderRadius: "50%", border: "none",
-                  background: "rgba(255,255,255,0.18)", color: "#fff", cursor: "pointer",
-                  fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                ✏️
-              </button>
-            )}
-          </div>
-
-          {/* ── 2) TITRE + ACTIONS ── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0 8px" }}>
+          {/* TITRE + ACTIONS */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexShrink: 0 }}>
             <div style={{ width: 38, height: 38, borderRadius: 12, fontSize: 20,
               background: `linear-gradient(135deg,#FF9A5C,${ORANGE})`,
               display: "flex", alignItems: "center", justifyContent: "center" }}>🧮</div>
@@ -469,8 +467,8 @@ export default function CalculatricePage() {
 
           {/* Historique */}
           {showHistory && (
-            <div style={{ background: "#fff", borderRadius: 14, padding: 10, marginBottom: 10,
-              maxHeight: 200, overflowY: "auto", boxShadow: "0 3px 10px rgba(0,0,0,0.08)" }}>
+            <div style={{ background: "#fff", borderRadius: 14, padding: 10, marginBottom: 8, flexShrink: 0,
+              maxHeight: 160, overflowY: "auto", boxShadow: "0 3px 10px rgba(0,0,0,0.08)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <b style={{ fontSize: 13 }}>Historique</b>
                 {history.length > 0 && (
@@ -496,11 +494,11 @@ export default function CalculatricePage() {
             </div>
           )}
 
-          {/* ── 3) CALCUL / CONVERTIR ── */}
-          <div style={{ display: "flex", background: "#E4E6F1", borderRadius: 16, padding: 4, marginBottom: 10 }}>
+          {/* CALCUL / CONVERTIR */}
+          <div style={{ display: "flex", background: "#E4E6F1", borderRadius: 16, padding: 4, marginBottom: 8, flexShrink: 0 }}>
             {([[false, "🧮  Calcul"], [true, "💱  Convertir"]] as const).map(([val, label]) => (
               <button key={label} onClick={() => setConvert(val)}
-                style={{ flex: 1, padding: "11px 4px", border: "none", borderRadius: 13, cursor: "pointer",
+                style={{ flex: 1, padding: "10px 4px", border: "none", borderRadius: 13, cursor: "pointer",
                   fontWeight: 700, fontSize: 13.5, fontFamily: "inherit",
                   background: convert === val ? "#fff" : "transparent",
                   color: convert === val ? NAVY : "#888",
@@ -510,61 +508,45 @@ export default function CalculatricePage() {
             ))}
           </div>
 
-          {/* ── 4) DE → VERS ── */}
+          {/* DE → VERS (comme l'app Flutter) */}
           {convert && (
-            <div style={{ marginBottom: 10 }}>
-              {([["DE", from, pickFrom], ["VERS", to, pickTo]] as const).map(([label, value, pick]) => (
-                <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                  <span style={{ width: 38, fontSize: 10, fontWeight: 700, color: "#888" }}>{label}</span>
-                  {CUR_ORDER.map(c => {
-                    const sel = value === c;
-                    return (
-                      <button key={c} onClick={() => pick(c)} title={CUR_NAME[c]}
-                        style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, padding: "7px 8px",
-                          background: "#fff", cursor: "pointer", fontFamily: "inherit", fontWeight: 700,
-                          fontSize: 13, color: NAVY, borderRadius: 14,
-                          border: `1.5px solid ${sel ? CUR_COLOR[c] : "#E4E6F1"}`,
-                          boxShadow: sel ? `0 3px 8px ${CUR_COLOR[c]}38` : "none",
-                          opacity: sel ? 1 : 0.65 }}>
-                        <span style={badge(c, 24)}>{CUR_SHORT[c]}</span>
-                        {CUR_LABEL[c]}
-                      </button>
-                    );
-                  })}
-                  {label === "DE" ? (
-                    <button onClick={swap} title="Inverser"
-                      style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: NAVY,
-                        color: "#fff", cursor: "pointer", fontSize: 16 }}>⇅</button>
-                  ) : <span style={{ width: 34 }} />}
-                </div>
-              ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexShrink: 0 }}>
+              {curPicker(from, true)}
+              <button onClick={swap} title="Inverser"
+                style={{ width: 38, height: 38, borderRadius: "50%", border: "none", background: NAVY,
+                  color: "#fff", cursor: "pointer", fontSize: 18, flexShrink: 0 }}>⇄</button>
+              {curPicker(to, false)}
             </div>
           )}
 
-          {/* ── 5) ÉCRAN ── */}
-          <div style={{ background: `linear-gradient(135deg, ${NAVY}, #262B4D)`, color: "#fff",
-            borderRadius: 26, padding: "14px 18px", minHeight: 118, textAlign: "right",
+          {/* ÉCRAN (prend l'espace disponible) */}
+          <div style={{ flex: 2, minHeight: 96, background: `linear-gradient(135deg, ${NAVY}, #262B4D)`, color: "#fff",
+            borderRadius: 26, padding: "12px 18px", textAlign: "right", overflow: "hidden",
+            display: "flex", flexDirection: "column", justifyContent: "flex-end",
             border: "1px solid rgba(255,255,255,0.06)", boxShadow: "0 6px 14px rgba(26,29,46,0.25)" }}>
-            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 15, minHeight: 22, wordBreak: "break-all" }}>
+            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: "clamp(13px, 2.4dvh, 20px)",
+              minHeight: 20, wordBreak: "break-all", overflow: "hidden", maxHeight: "2.8em" }}>
               {expr ? pretty(expr) : " "}
             </div>
-            <div style={{ fontSize: main.length > 12 ? 30 : 42, fontWeight: 700, marginTop: 6,
+            <div style={{ fontSize: longMain ? "clamp(22px, 4.4dvh, 36px)" : "clamp(30px, 7dvh, 60px)",
+              fontWeight: 700, marginTop: 4, lineHeight: 1.1,
               color: div0 ? "#ff5252" : "#fff", overflowWrap: "anywhere" }}>{main}</div>
             {convert && !div0 && (
-              <div style={{ color: CUR_LIGHT[to], fontSize: main.length > 14 ? 20 : 25, fontWeight: 700, marginTop: 4 }}>
+              <div style={{ color: CUR_LIGHT[to], fontSize: main.length > 14 ? "clamp(16px, 3dvh, 22px)" : "clamp(18px, 4dvh, 32px)",
+                fontWeight: 700, marginTop: 4, lineHeight: 1.1 }}>
                 {convLine}
               </div>
             )}
           </div>
 
-          {/* ── 6) ÉQUIVALENCES ── */}
+          {/* ÉQUIVALENCES */}
           {convert && (
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexShrink: 0 }}>
               {CUR_ORDER.map(c => {
                 const v = convertTo(res ?? 0, from, c);
                 const isFrom = c === from;
                 return (
-                  <div key={c} style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderRadius: 14,
+                  <div key={c} style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: 14,
                     background: `${CUR_COLOR[c]}${isFrom ? "29" : "12"}`,
                     border: `1px solid ${CUR_COLOR[c]}${isFrom ? "bf" : "40"}` }}>
                     <div style={{ color: CUR_COLOR[c], fontWeight: 700, fontSize: 11 }}>{CUR_LABEL[c]}</div>
@@ -577,8 +559,9 @@ export default function CalculatricePage() {
             </div>
           )}
 
-          {/* ── 7) CLAVIER ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 12 }}>
+          {/* CLAVIER (grille qui remplit l'espace restant) */}
+          <div style={{ flex: 5, minHeight: 260, display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateRows: "repeat(5, 1fr)", gap: 8, marginTop: 10 }}>
             {rows.flat().map(k => (
               <button key={k} onClick={() => press(k)} style={keyStyle(k)}
                 onContextMenu={e => { if (k === "⌫") { e.preventDefault(); press("C"); } }}>
@@ -586,15 +569,8 @@ export default function CalculatricePage() {
               </button>
             ))}
           </div>
-          <p style={{ margin: "12px 0 0", textAlign: "center", color: "#aaa", fontSize: 11 }}>
-            Clavier accepté : 0-9 + - * / % Entrée Retour Échap
-          </p>
         </div>
       </div>
-
-      {showTauxModal && (
-        <TauxModal taux={taux} onClose={() => setShowTauxModal(false)} onSave={saveTaux} />
-      )}
 
       {snack && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
@@ -603,63 +579,5 @@ export default function CalculatricePage() {
           boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>{snack.msg}</div>
       )}
     </main>
-  );
-}
-
-// ─── 6. MODAL TAUX (admin) ───────────────────────────────────────────────────
-function TauxModal({ taux, onClose, onSave }: {
-  taux: number; onClose: () => void; onSave: (v: number) => Promise<void>;
-}) {
-  const [val, setVal] = useState(plain(taux, 4));
-  const [err, setErr] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const n = parseFloat(val.replace(",", "."));
-
-  const submit = async () => {
-    if (saving) return;
-    if (isNaN(n) || n <= 0 || n > 100000) { setErr("Taux invalide"); return; }
-    setSaving(true);
-    await onSave(n);
-    setSaving(false);
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 300,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-      onClick={saving ? undefined : onClose}>
-      <div onClick={e => e.stopPropagation()}
-        style={{ background: "#1A1D2E", borderRadius: 22, padding: 24, width: "100%", maxWidth: 400, color: "#fff" }}>
-        <h2 style={{ margin: "0 0 14px", fontSize: 18 }}>💱 Taux du jour</h2>
-        <input type="text" inputMode="decimal" autoFocus value={val} disabled={saving}
-          onChange={e => { setVal(e.target.value); setErr(null); }}
-          onKeyDown={e => { if (e.key === "Enter") submit(); }}
-          placeholder="1 $ = ? HTG"
-          style={{ width: "100%", padding: "12px 14px", background: "rgba(255,255,255,0.06)",
-            border: "1px solid #333", borderRadius: 12, color: "#fff", fontSize: 16,
-            outline: "none", boxSizing: "border-box" }} />
-        {err && <p style={{ color: "#ff4444", fontSize: 12, margin: "6px 0 0" }}>{err}</p>}
-        {!isNaN(n) && n > 0 && (
-          <div style={{ background: "rgba(170,0,255,0.12)", borderRadius: 12, padding: 10,
-            marginTop: 10, fontSize: 12, lineHeight: 1.6 }}>
-            1 $ = {fmt(n, 4)} HTG<br />
-            1 $ = {fmt(n / DH_RATE, 4)} $HT<br />
-            1 $HT = {fmt(DH_RATE)} HTG (fixe)
-          </div>
-        )}
-        <p style={{ color: "#888", fontSize: 11, margin: "10px 0 0" }}>
-          Ce taux est utilisé dans toute l&apos;application (facturation, produits) et sur le site.
-        </p>
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={onClose} disabled={saving}
-            style={{ flex: 1, padding: 12, background: "rgba(255,255,255,0.06)", border: "1px solid #333",
-              color: "#aaa", borderRadius: 12, cursor: "pointer", fontSize: 14 }}>Annuler</button>
-          <button onClick={submit} disabled={saving}
-            style={{ flex: 1, padding: 12, background: saving ? "#555" : "#00C853", border: "none",
-              color: "#fff", borderRadius: 12, cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
-            {saving ? "..." : "Enregistrer"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
